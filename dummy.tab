@@ -1,0 +1,10 @@
+
+enum(N) { ONE=1 OH=0 }
+
+template {{
+
+0 : NOLL
+1 : ETT
+n : DIG{Nn}
+
+}}

@@ -1,0 +1,31 @@
+LS1: 1-16 (0000xxxx)
+LS2: 16,32,48,64,80,96,112,128 (0xxx000)
+
+
+
+Format 0nnnnnnn:
+prefix#
+
+Format 10xyyyyy:
+x:
+0 push prefix||y
+1 push ~(prefix||y)
+
+Format 110xyyyy:
+x:
+0 unary/binary op
+1 <<(y+1)
+
+Format 111xxyyy:
+x:
+00 <<((y+1)*16)
+01 output prefix (y bit (y<8))
+10 output #n-byte (y*8 bit (y*8<64))
+11 output top stack (y*8 bit)
+
+
+11101000  output top stack (prefix = #bits)
+11110000  output # any bits (prefix = #bits)
+
+11111000  ledig
+11100000  ledig

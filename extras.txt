@@ -1,0 +1,10 @@
+1101rrrzzzaaaaaa : ADD Ea,Ar
+
+ | T_X_4 c_E T_COMMA c_A
+	{ GEN(MKOR(MKICON(53696l|($4)<<9),$2),16);  }
+
+00000110ssaaaaaa Is : ADD #1,Ea
+
+ | T_X_4 T_X_9 c_I1 T_COMMA c_E
+	{ HOLD(MKICON(($3)),16); GEN(MKOR(MKICON(53696l),$5),16); }
+

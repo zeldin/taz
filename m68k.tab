@@ -1,0 +1,60 @@
+
+enum(D) { D0 D1 D2 D3 D4 D5 D6 D7 }	// D registers
+enum(A) { A0 A1 A2 A3 A4 A5 A6 A7 }	// A registers
+
+enum(S) { .B=0 .W=1 .L=2 } default=1	// Data instruction size
+enum(Z) { .W=3 .L=7 } default=7		// Addr instruction size
+enum(Y) { .W=0 .L=1 } default=1		// Absolute addr size
+
+numeric(Q) wraparound bits=3		// ADDQ/SUBQ operand
+
+numeric(I0) bits=8  zpadto=16	// .B immediate
+numeric(I1) bits=16		// .W immediate
+numeric(I2) bits=32		// .L immediate
+
+numeric(O0) signed bits=16	// .W addr
+numeric(O1) signed bits=32	// .L addr
+
+numeric(W) signed bits=16
+numeric(B) signed bits=8
+
+template(E) {{
+
+000ddd : Dd
+001aaa : Aa
+010aaa : (Aa)
+011aaa : (Aa)+
+100aaa : -(Aa)
+
+110aaa 0xxxz000nnnnnnnn : (Bn,Aa,Dx{Yz})
+110aaa 1xxxz000nnnnnnnn : (Bn,Aa,Ax{Yz})
+
+111011 0xxxz000nnnnnnnn : (Bn,PC,Dx{Yz})
+111011 1xxxz000nnnnnnnn : (Bn,PC,Ax{Yz})
+
+}}
+
+// 101aaa W : (1,Aa)
+
+// 11100y Oy : 1 Yy
+// 111010 W : (1,PC)
+
+template {{
+
+1100xxx100000yyy : ABCD Dy,Dx
+1100xxx100001yyy : ABCD -(Ay),-(Ax)
+1101rrr0ssaaaaaa : ADD{Ss} Ea,Dr
+1101rrr1ssaaaaaa : ADD{Ss} Dr,Ea
+1101rrrzzzaaaaaa : ADDA{Zz} Ea,Ar
+1101rrrzzzaaaaaa : ADD{Zz} Ea,Ar
+
+0101nnn0ssaaaaaa : ADDQ{Ss} #Qn,Ea
+1101xxx1ss000yyy : ADDX{Ss} Dy,Dx
+1101xxx1ss001yyy : ADDX{Ss} -(Ay),-(Ax)
+
+00000110ssaaaaaa Is : ADDI{Ss} #1,Ea
+00000110ssaaaaaa Is : ADD{Ss} #1,Ea
+
+}}
+
+
