@@ -1,8 +1,11 @@
 #
-# $Id: Makefile,v 1.1.1.1 1997-08-28 23:26:03 marcus Exp $
+# $Id: Makefile,v 1.2 1997-08-28 23:42:30 marcus Exp $
 #
 # $Log: Makefile,v $
-# Revision 1.1.1.1  1997-08-28 23:26:03  marcus
+# Revision 1.2  1997-08-28 23:42:30  marcus
+# make clean now removes y.output.
+#
+# Revision 1.1.1.1  1997/08/28 23:26:03  marcus
 # Imported sources
 #
 
@@ -27,7 +30,7 @@ clean :
 	-$(RM) *.o *~ core
 	-$(RM) $(TARGET) asmgen sieve
 	-$(RM) lexer.c lexer.l
-	-$(RM) gram.c gram.h gram.y y.tab.c y.tab.h
+	-$(RM) gram.c gram.h gram.y y.tab.c y.tab.h y.output
 	-$(RM) aglexer.c aggram.c aggram.h
 
 $(TARGET) : $(OBJS)
