@@ -92,6 +92,8 @@ templatedefs : templatedefs templatedef { $$ = listadd($1, $2); }
 
 templatedef : bitfield T_TEMPLWS extrafields T_COLON tpattern
 		{ $$ = mktemplate($1, $3, $5); }
+	    | T_COLON tpattern
+		{ $$ = mktemplate(mklist(), mklist(), $2); }
 
 bitfield : bitfieldcomps
 

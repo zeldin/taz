@@ -1,8 +1,11 @@
 /*
- * $Id: asmgen.c,v 1.1.1.1 1997-08-28 23:26:03 marcus Exp $
+ * $Id: asmgen.c,v 1.2 1997-09-27 01:52:56 marcus Exp $
  *
  * $Log: asmgen.c,v $
- * Revision 1.1.1.1  1997-08-28 23:26:03  marcus
+ * Revision 1.2  1997-09-27 01:52:56  marcus
+ * An empty primary is now accepted.
+ *
+ * Revision 1.1.1.1  1997/08/28 23:26:03  marcus
  * Imported sources
  *
  */
@@ -202,8 +205,10 @@ void gen_productions(FILE *f, int mask, VT tl, char *name)
       fprintf(f, ",%d); ", print_slicedexp(f, bss));
     }
     if(name==NULL) {
-      fprintf(f, "GEN(");
-      fprintf(f, ",%d);", print_slicedexp(f, t->xtemplate.primary));
+      if(t->xtemplate.primary->xlist.num>0) {
+	fprintf(f, "GEN(");
+	fprintf(f, ",%d);", print_slicedexp(f, t->xtemplate.primary));
+      }
     } else {
       fprintf(f, "$$ = ");
       print_slicedexp(f, t->xtemplate.primary);
@@ -639,10 +644,16 @@ void crunchbitslice(VT bs, int *pos, VT vars, char *name)
   *pos+=nc;
 }
 
-VT getsliceclass(VT el, int n)
+VT getsliceclass(VT p, VT el, int n)
 {
   VT i1, i2, e, b;
 
+  LISTITER(p, i2, b) {
+    xassert(b, XBITSLICE);
+    if(b->xbitslice.classname!=NIL && b->xbitslice.classname->type==XCLASS)
+      if(!--n)
+	return b->xbitslice.classname;
+  }
   LISTITER(el, i1, e) {
     LISTITER(e, i2, b) {
       xassert(b, XBITSLICE);
@@ -687,7 +698,8 @@ void crunchtemplate(VT tl, char *name)
 		  tok->xnumber.num, name);
 	  exit(1);
 	}
-	if((cl=getsliceclass(t->xtemplate.extras, tok->xnumber.num))==NIL) {
+	if((cl=getsliceclass(t->xtemplate.primary, t->xtemplate.extras,
+			     tok->xnumber.num))==NIL) {
 	  fprintf(stderr, "unable to resolve pattern reference %d in %s\n",
 		  tok->xnumber.num, name);
 	  exit(1);	  
