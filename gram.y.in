@@ -229,7 +229,3 @@ int checknumX(int val, int bits)
   return val;
 }
 
-void emit_16(int v)
-{
-  printf("EMIT: %04x\n", v&0xffff);
-}
