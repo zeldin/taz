@@ -13,7 +13,7 @@ CC = gcc
 LEX = flex
 YACC = bison -y
 RM = rm -f
-CFLAGS = -g -Wall -pedantic -DDEBUG -DDEBUG_MALLOC # -O4711
+CFLAGS = -g -Wall -pedantic -DDEBUG -DDEBUG_MALLOC -DTARGET=\"$(TARGET)\" # -O4711
 
 TARGET = as68k
 ASMGENFILE = m68k.tab
@@ -22,7 +22,7 @@ HASHSIZE = 12000
 OBJS = main.o lexer.o gram.o file.o symbol.o storage.o macro.o smach.o \
 		backend.o dmalloc.o
 
-AGOBJS = asmgen.o aglexer.o aggram.o agstorage.o file.o storage.o dmalloc.o
+AGOBJS = asmgen.o aglexer.o aggram.o agstorage.o fileag.o storage.o dmalloc.o
 
 all : $(TARGET)
 
@@ -79,7 +79,10 @@ gram.o : gram.c gram.h taz.h smach.h backend.h
 
 main.o : main.c taz.h smach.h backend.h
 
-file.o : file.c taz.h
+file.o : file.c taz.h smach.h
+
+fileag.o : file.c taz.h
+	$(CC) $(CFLAGS) -DNO_SMACH -c -o $@ $<
 
 symbol.o : symbol.c taz.h hashsize.h
 

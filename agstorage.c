@@ -126,13 +126,14 @@ VT mkenum()
   return e;
 }
 
-VT mknumeric(char s, int b, int p)
+VT mknumeric(char s, int b, int p, int r)
 {
   VT n=poolalloc(&numericpool);
   n->type=XNUMERIC;
   n->xnumeric.signedness=s;
   n->xnumeric.bits=b;
   n->xnumeric.padbits=p;
+  n->xnumeric.relative=r;
   return n;
 }
 

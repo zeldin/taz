@@ -43,6 +43,8 @@ struct mempool {
 #define SYMB_SET   2
 #define SYMB_MACRO 3
 #define SYMB_RELOC 4
+#define SYMB_UNDECIDED 5
+#define SYMB_UNDSET 6
 
 struct symbol {
   struct symbol *chain;
@@ -56,8 +58,10 @@ struct symbol {
   int defined_line;
 };
 
-extern int current_lineno, numerrors;
+extern int current_lineno, numerrors, numlines;
 extern const char *current_filename;
+extern number *current_loc;
+extern struct symbol *currloc_sym;
 
 extern void errormsg(const char *, ...)
 #ifdef __GNUC__
@@ -84,12 +88,16 @@ extern int process_file(const char *);
 extern int process_include(const char *);
 extern void add_incdir(const char *);
 extern int file_yywrap();
+extern void filestack_push(int);
+extern void filestack_pop();
 
 extern void symbol_init();
 extern void symbol_end();
 extern struct symbol *lookup_symbol(const char *);
 extern struct symbol *create_symbol(char *, int);
 extern void init_symbols();
+extern int symbol_check();
+extern void flushlocalsyms();
 
 extern void macro_init();
 extern void macro_end();

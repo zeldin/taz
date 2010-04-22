@@ -27,7 +27,7 @@ struct stdtoken { char *str, *token; } stdtok[] = {
   { ">>", "T_SHR" },
   { "<=", "T_LE" },
   { ">=", "T_GE" },
-  { "==", "T_EQ" },
+  { "==", "T_EQL" },
   { "!=", "T_NE" },
   { "~",  "T_COMPL" },
   { "!",  "T_NOT" },
@@ -259,6 +259,13 @@ void gen_output(FILE *f, int mask)
       xassert(cls, XNUMERIC);
       if(mask&M_NUMPROD) {
 	fprintf(f, "\n%s : expr\n", buf);
+	if(cls->xnumeric.relative != -1)
+	  fprintf(f, "  { $$ = checknum%c(MKSUB($1, MKADD(mksymbref(currloc_sym), MKICON(%d))), %d); }\n",
+		  cls->xnumeric.signedness, cls->xnumeric.relative,
+		  cls->xnumeric.bits);	  
+	else
+	  fprintf(f, "  { $$ = checknum%c($1, %d); }\n",
+		  cls->xnumeric.signedness, cls->xnumeric.bits);
       }
       if(mask&M_CLASSTYPES)
 	fprintf(f, "%%type <exp> %s\n", buf);      

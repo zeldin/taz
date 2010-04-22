@@ -3,8 +3,8 @@
 #include <string.h>
 #include "taz.h"
 
-#ifndef min
-#define min(a,b) ((a)<(b)?(a):(b))
+#ifndef max
+#define max(a,b) ((a)>(b)?(a):(b))
 #endif
 
 struct mempool macrotextpool;
@@ -41,9 +41,9 @@ void macro_storearg(int n, const char *arg)
   nummacargs++;
   if(macargbufuse+l>=macargbufmax)
     if(macargbuf)
-      macargbuf=realloc(macargbuf, macargbufmax=min(macargbufmax<<1, macargbufuse+l+1));
+      macargbuf=realloc(macargbuf, macargbufmax=max(macargbufmax<<1, macargbufuse+l+1));
     else
-      macargbuf=malloc(macargbufmax=min(256, l+1));
+      macargbuf=malloc(macargbufmax=max(256, l+1));
   if(!macargbuf) {
     fprintf(stderr, "Fatal: Out of memory!\n");
     exit(2);

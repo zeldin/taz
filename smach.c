@@ -30,6 +30,7 @@ union smval {
   } ls;
 };
 
+static struct symbol *changed;
 
 #define OP_PREFIX(n) (n)
 #define OP_PUSH(n) (0x80|(n))
@@ -40,11 +41,20 @@ union smval {
 #define OP_ARITH(n) (0xc3+(n)-M_NEG)
 #define OP_LS1(n) (0xd0|((n)-1))
 #define OP_LS2(n) (0xe0|(((n)>>4)-1))
-#define OP_STPREFIX(n) (0xe8|(n))
+/* #define OP_STPREFIX(n) (0xe8|(n)) */
+#define OP_ORG    0xe9
+#define OP_CNOP   0xea
+#define OP_XARITH 0xeb
+#define OP_CHECKU 0xec
+#define OP_CHECKS 0xed
+#define OP_CHECKW 0xee
+#define OP_CHECKX 0xef
 #define OP_STINLINE(n) (0xf0|((n)>>3))
 #define OP_STORE(n) (0xf8|((n)>>3))
 #define OP_STOREPB (0xe8)
 #define OP_STINLINEPB (0xf0)
+#define OP_LINENO (0xe0)
+#define OP_FILENAME (0xf8)
 
 static union smval *SMVs;
 static int numSMVs, maxSMVs;
@@ -58,14 +68,14 @@ static int regd_blks, allocated_blks;
 #define CODEBLKSZ (0x10000)
 
 #define EMIT(b) ((emit_p+1<emit_brk?(void)(*emit_p++=(b)):femit(b)))
-#define ALLOT(n) ((emit_p+(n)<emit_brk?(void)0:extend_emit(n)),(emit_p+=(n)))
+#define ALLOT(b,n) ((emit_p+(n)+1<emit_brk?(void)0:extend_emit((n)+1)),*emit_p++=(b),(emit_p+=(n)))
 
 #define STKVAL0(n) (valstack[n])
 #define STKVAL(n) (STKVAL0(stkp-(n)-1))
 #define PUSH(n) (STKVAL0(stkp++)=(n))
 #define POP (STKVAL0(--stkp))
 
-static int stkp=0;
+static int stkp=0, saved_lineno;
 static numtype valstack[100];
 
 static SMV allocSMV()
@@ -99,10 +109,56 @@ static SMV divzeroSMV()
 
 SMV mksymbref(struct symbol *sy)
 {
-  SMV s=allocSMV();
-  SMVelt(s,type)=M_SYMB;
-  SMVelt(s,symbol.symb)=sy;
-  return s;
+  if(sy->type == SYMB_EQU || sy->type == SYMB_SET)
+    return mkicon(sy->value.num);
+  else {
+    SMV s=allocSMV();
+    SMVelt(s,type)=M_SYMB;
+    SMVelt(s,symbol.symb)=sy;
+    return s;
+  }
+}
+
+SMV mkchecknum(int t, SMV v, int b)
+{
+  if(SMVelt(v,type)==M_ICON) {
+    switch(t) {
+     case M_CHECKU:
+       if(SMVelt(v,number.num)<0 || SMVelt(v,number.num)>=(1<<b)) {
+	 errormsg("value is out of range %d bits unsigned", b);
+	 return mkicon(0);
+       }
+       break;
+     case M_CHECKS:
+       if(SMVelt(v,number.num)<-(1<<(b-1)) ||
+	  SMVelt(v,number.num)>=(1<<(b-1))) {
+	 errormsg("value is out of range %d bits signed", b);
+	 return mkicon(0);
+       }
+       break;
+     case M_CHECKW:
+       if(SMVelt(v,number.num)<1 || SMVelt(v,number.num)>(1<<b)) {
+	 errormsg("value is out of range %d bits wraparound", b);
+	 return mkicon(0);
+       }
+       break;
+     case M_CHECKX:
+       if(SMVelt(v,number.num)<-(1<<b) || SMVelt(v,number.num)>=(1<<b)) {
+	 errormsg("value is out of range %d bits", b);
+	 return mkicon(0);
+       }
+       break;
+    }
+    SMVelt(v,number.num)=SMVelt(v,number.num)&((1<<b)-1);
+    return v;
+  }
+  else {
+    SMV s=allocSMV();
+    SMVelt(s,type)=t;
+    SMVelt(s,ls.v)=v;
+    SMVelt(s,ls.n)=b;
+    return s;
+  }
 }
 
 SMV mkunary(int t, SMV v)
@@ -214,7 +270,7 @@ void smach_flush()
 
 static void register_codeblk(unsigned char *p)
 {
-  if(regd_blks<=allocated_blks) {
+  if(regd_blks>=allocated_blks) {
     if(allocated_blks != 0) {
       allocated_blks <<= 1;
       code_blk = realloc(code_blk, allocated_blks*sizeof(unsigned char **));
@@ -234,7 +290,7 @@ static void extend_emit(int n)
 {
   if(emit_p)
     *emit_p = OP_BREAK;
-  if(n<CODEBLKSZ)
+  if(++n<CODEBLKSZ)
     n=CODEBLKSZ;
   emit_p = malloc(n);
   emit_brk = emit_p + n;
@@ -283,6 +339,18 @@ void smach_dump(FILE *f, SMV v)
   case M_LS1:
   case M_LS2:
     smach_dump(f, SMVelt(v, ls).v); fprintf(f, "<<%d", SMVelt(v, ls).n); break;
+  case M_CHECKU:
+    fprintf(f, "U%d(", SMVelt(v, ls).n); smach_dump(f, SMVelt(v, ls).v);
+    fprintf(f, ")"); break;
+  case M_CHECKS:
+    fprintf(f, "S%d(", SMVelt(v, ls).n); smach_dump(f, SMVelt(v, ls).v);
+    fprintf(f, ")"); break;
+  case M_CHECKW:
+    fprintf(f, "W%d(", SMVelt(v, ls).n); smach_dump(f, SMVelt(v, ls).v);
+    fprintf(f, ")"); break;
+  case M_CHECKX:
+    fprintf(f, "X%d(", SMVelt(v, ls).n); smach_dump(f, SMVelt(v, ls).v);
+    fprintf(f, ")"); break;
   default:
     fprintf(f, "?%d?", SMVelt(v,type));
   }
@@ -293,6 +361,8 @@ static void emit_prefix(numtype n)
   unsigned char s[sizeof(numtype)*2];
   int z=0;
 
+  if(!n)
+    return;
   while(n>0x7f) {
     s[z++] = (n&0x7f);
     n >>= 7;
@@ -310,7 +380,6 @@ static void emit_symprefix(struct symbol *s)
 static void emit_inline(numtype n, int b)
 {
   unsigned char *p;
-  ALLOT(b);
   for(p=emit_p; b--;) {
     *--p = n&0xff;
     n >>= 8;
@@ -360,10 +429,48 @@ static void emit(SMV v)
     emit(SMVelt(v,ls).v);
     EMIT(OP_LS2(SMVelt(v,ls).n));
     break;
+  case M_CHECKU:
+    emit(SMVelt(v,ls).v);
+    emit_prefix(SMVelt(v,ls).n);
+    EMIT(OP_CHECKU);
+    break;
+   case M_CHECKS:
+    emit(SMVelt(v,ls).v);
+    emit_prefix(SMVelt(v,ls).n);
+    EMIT(OP_CHECKS);
+    break;
+  case M_CHECKW:
+    emit(SMVelt(v,ls).v);
+    emit_prefix(SMVelt(v,ls).n);
+    EMIT(OP_CHECKW);
+    break;
+  case M_CHECKX:
+    emit(SMVelt(v,ls).v);
+    emit_prefix(SMVelt(v,ls).n);
+    EMIT(OP_CHECKX);
+    break;
   default:
     fprintf(stderr, "Internal error: smach:emit(%d)\n", SMVelt(v,type));
     exit(3);
   }
+}
+
+void smach_pushfile(int id)
+{
+  if(current_lineno > saved_lineno) {
+    emit_prefix(current_lineno-saved_lineno-1);
+    EMIT(OP_LINENO);
+    saved_lineno = current_lineno;
+  }
+  emit_prefix(id+1);
+  EMIT(OP_FILENAME);
+  saved_lineno = 0;
+}
+
+void smach_popfile()
+{
+  EMIT(OP_FILENAME);
+  saved_lineno = current_lineno;
 }
 
 void smach_emit(SMV v, int b)
@@ -372,17 +479,23 @@ void smach_emit(SMV v, int b)
     fprintf(stderr, "EMIT%d ", b);
     smach_dump(stderr, v);
     fprintf(stderr, "\n");
-    */
+  */
+  if(current_lineno > saved_lineno) {
+    emit_prefix(current_lineno-saved_lineno-1);
+    EMIT(OP_LINENO);
+    saved_lineno = current_lineno;
+  }
   if(SMVelt(v,type)==M_ICON) {
-    if(b<8) {
-      EMIT(OP_PREFIX(SMVelt(v,number).num&0x7f));
-      EMIT(OP_STPREFIX(b));
-    } else if((b&7) || b>=64) {
+    /*  if(b<8) {
+     if(SMVelt(v,number).num&0x7f)
+       EMIT(OP_PREFIX(SMVelt(v,number).num&0x7f));
+     EMIT(OP_STPREFIX(b));
+     } else*/ if((b&7) || b>=64) {
       emit_prefix(b);
-      EMIT(OP_STINLINEPB);
+      ALLOT(OP_STINLINEPB, (b+7)>>3);
       emit_inline(SMVelt(v,number).num, (b+7)>>3);
     } else {
-      EMIT(OP_STINLINE(b));
+      ALLOT(OP_STINLINE(b), b>>3);
       emit_inline(SMVelt(v,number).num, b>>3);
     }
   } else {
@@ -392,6 +505,35 @@ void smach_emit(SMV v, int b)
       EMIT(OP_STOREPB);
     } else
       EMIT(OP_STORE(b));
+  }
+}
+
+void smach_setsym(struct symbol *s, SMV v)
+{
+  numtype n;
+
+  if(s == currloc_sym) {
+    emit(v);
+    EMIT(OP_ORG);
+  } else if(evalconst(v, &n))
+    s->value.num = n;
+  else {
+    s->type = (s->type==SYMB_SET? SYMB_UNDSET : SYMB_UNDECIDED);
+    emit(v);
+    emit_symprefix(s);
+    EMIT(OP_STOREL);
+  }
+}
+
+void smach_cnop(numtype offs, numtype modulo)
+{
+  if(modulo<=0 || (modulo & (modulo - 1)) != 0)
+    errormsg("second argument to cnop must be a positive power of two");
+  else if(offs<0 || offs>=modulo)
+    errormsg("first argument to cnop out of range");
+  else {
+    emit_prefix(modulo | offs);
+    EMIT(OP_CNOP);
   }
 }
 
@@ -406,9 +548,16 @@ static struct symbol *locate_sym(numtype n)
   return (struct symbol *)(void *)n;
 }
 
-static void smach_execute(unsigned char *p)
+static numtype findmsb(numtype n)
 {
-  numtype pfx=0;
+  numtype b=1;
+  while(b<=n) b<<=1;
+  return b>>1;
+}
+
+static numtype smach_execute(unsigned char *p, numtype p0)
+{
+  numtype pfx=p0;
 
   for(;;) {
     int o=*p++;
@@ -421,15 +570,15 @@ fprintf(stderr, "\n");
     if(o&0x80) {
       if(o&0x40) switch(o) {
       case OP_BREAK:
-	return;
+	return pfx;
       case OP_ARITH(M_NEG): STKVAL(0)=-STKVAL(0); break;
       case OP_ARITH(M_CPL): STKVAL(0)=~STKVAL(0); break;
       case OP_ARITH(M_NOT): STKVAL(0)=!STKVAL(0); break;
       case OP_ARITH(M_ADD): STKVAL(1)+=STKVAL(0); (void)POP; break;
       case OP_ARITH(M_SUB): STKVAL(1)-=STKVAL(0); (void)POP; break;
       case OP_ARITH(M_MUL): STKVAL(1)*=STKVAL(0); (void)POP; break;
-      case OP_ARITH(M_DIV): STKVAL(1)/=STKVAL(0); (void)POP; break;
-      case OP_ARITH(M_MOD): STKVAL(1)%=STKVAL(0); (void)POP; break;
+      case OP_ARITH(M_DIV): if(STKVAL(0)) STKVAL(1)/=STKVAL(0); else errormsg("Division by zero"); (void)POP; break;
+      case OP_ARITH(M_MOD): if(STKVAL(0)) STKVAL(1)%=STKVAL(0); else errormsg("Division by zero"); (void)POP; break;
       case OP_ARITH(M_AND): STKVAL(1)&=STKVAL(0); (void)POP; break;
       case OP_ARITH(M_OR): STKVAL(1)|=STKVAL(0); (void)POP; break;
       case OP_ARITH(M_XOR): STKVAL(1)^=STKVAL(0); (void)POP; break;
@@ -458,6 +607,31 @@ fprintf(stderr, "\n");
       case OP_LS2(96): STKVAL(0)<<=96; break;
       case OP_LS2(112): STKVAL(0)<<=112; break;
       case OP_LS2(128): STKVAL(0)<<=128; break;
+      case OP_CHECKU:
+	if(STKVAL(0)<0 || STKVAL(0)>=(1<<pfx))
+	  errormsg("value is out of range %d bits unsigned", (int)pfx);
+	STKVAL(0) &= (1<<pfx)-1;
+	pfx = 0;
+	break;
+      case OP_CHECKS:
+	if(STKVAL(0)<-(1<<(pfx-1)) || STKVAL(0)>=(1<<(pfx-1)))
+	  errormsg("value is out of range %d bits signed", (int)pfx);
+	STKVAL(0) &= (1<<pfx)-1;
+	pfx = 0;
+	break;
+      case OP_CHECKW:
+	if(STKVAL(0)<1 || STKVAL(0)>(1<<pfx))
+	  errormsg("value is out of range %d bits wraparound", (int)pfx);
+	STKVAL(0) &= (1<<pfx)-1;
+	pfx = 0;
+	break;
+      case OP_CHECKX:
+	if(STKVAL(0)<-(1<<pfx) || STKVAL(0)>=(1<<pfx))
+	  errormsg("value is out of range %d bits", (int)pfx);
+	STKVAL(0) &= (1<<pfx)-1;
+	pfx = 0;
+	break;
+	/*
       case OP_STPREFIX(1): EMIT1(pfx); pfx=0; break;
       case OP_STPREFIX(2): EMIT2(pfx); pfx=0; break;
       case OP_STPREFIX(3): EMIT3(pfx); pfx=0; break;
@@ -465,7 +639,8 @@ fprintf(stderr, "\n");
       case OP_STPREFIX(5): EMIT5(pfx); pfx=0; break;
       case OP_STPREFIX(6): EMIT6(pfx); pfx=0; break;
       case OP_STPREFIX(7): EMIT7(pfx); pfx=0; break;
-      case OP_STINLINE(8): EMITI(1,p); p++; break;
+	*/
+      case OP_STINLINE(8):  EMITI(1,p); p++; break;
       case OP_STINLINE(16): EMITI(2,p); p+=2; break;
       case OP_STINLINE(24): EMITI(3,p); p+=3; break;
       case OP_STINLINE(32): EMITI(4,p); p+=4; break;
@@ -481,15 +656,34 @@ fprintf(stderr, "\n");
       case OP_STORE(56): EMIT56(POP); break;
       case OP_STOREPB: EMITN(pfx,POP); pfx=0; break;
       case OP_STINLINEPB: EMITI(pfx,p); p+=(pfx+7)>>3; pfx=0; break;
+      case OP_ORG: { numtype a = POP; be_setloc(a); break;}
+      case OP_CNOP: { numtype b = findmsb(pfx); pfx &= (b-1);
+                      while(((*current_loc)&(b-1)) != pfx) EMIT8(0); pfx=0;
+                      break; }
+      case OP_LINENO: current_lineno += pfx+1; pfx=0; break;
+      case OP_FILENAME: if(pfx) { filestack_push(pfx-1); current_lineno=0;
+				  pfx=0; } else filestack_pop(); break;
 	
       case OP_LOADL:
 	{
 	  struct symbol *s = locate_sym(pfx);
-	  PUSH(s->value.num);
+	  PUSH((s->value.num==0xdeadbeef? *current_loc : s->value.num));
 	  pfx=0;
 	  break;
 	}
       case OP_STOREL:
+	{
+	  struct symbol *s = locate_sym(pfx);
+	  numtype n = POP;
+	  if(n != s->value.num) {
+	    s->value.num = n;
+	    if(changed == NULL)
+	      changed = s;
+	  }
+	  pfx=0;
+	  break;
+	}
+
       default:
 	fprintf(stderr, "Internal error: smach:smach_execute(%02x)\n", o);
 	exit(3);
@@ -501,15 +695,24 @@ fprintf(stderr, "\n");
     } else {
       pfx <<= 7;
       pfx |= o;
+      if(pfx == 0) {
+	fprintf(stderr, "Internal error: smach:pfx == 0\n");
+	exit(3);
+      }
     }
   }
 }
 
-void smach_run()
+struct symbol *smach_run()
 {
   int p;
+  numtype pfx = 0;
+  changed = NULL;
+  current_lineno = 0;
+  reset_sections();
   for(p=0; p<regd_blks; p++)
-    smach_execute(code_blk[p]);
+    pfx = smach_execute(code_blk[p], pfx);
+  return changed;
 }
 
 void smach_init()
@@ -519,6 +722,7 @@ void smach_init()
   emit_p = emit_brk = NULL;
   code_blk = NULL;
   regd_blks = allocated_blks = 0;
+  saved_lineno = 0;
 }
 
 void smach_end()
