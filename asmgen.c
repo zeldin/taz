@@ -259,6 +259,8 @@ void gen_output(FILE *f, int mask)
       xassert(cls, XNUMERIC);
       if(mask&M_NUMPROD) {
 	fprintf(f, "\n%s : expr\n", buf);
+	fprintf(f, "  { $$ = checknum%c($1, %d); }\n",
+		cls->xnumeric.signedness, cls->xnumeric.bits);
       }
       if(mask&M_CLASSTYPES)
 	fprintf(f, "%%type <exp> %s\n", buf);      
