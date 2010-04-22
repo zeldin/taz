@@ -72,7 +72,7 @@ wraparound	return T_WRAPAROUND;
 <T2>\n		{ current_lineno++; BEGIN(T0); }
 <T2>{number}	{ yylval.num=strtol(yytext, NULL, 0); return T_TEMPNUMTOK; }
 <T2>{class}{var}	{ yylval.str=yytext; return T_TEMPCLASS; }
-<T2>([^ \t\n{\\A-Z0-9]|\\.|[A-Z]+[^a-z{ \t\n])+	{ yylval.str=strdup(fixup(yytext)); return T_TEMPLITTOK; }
+<T2>(([^ \t\n{\\A-Z0-9]|\\.|[A-Z]+[^a-z{ \t\n])+([A-Z]+[^a-z{])?|[A-Z]+[^a-z{])	{ if(yytext[yyleng-1]=='\n') { current_lineno++; BEGIN(T0); } yylval.str=strdup(fixup(yytext)); return T_TEMPLITTOK; }
 
 {ws}+		;
 <*>\n		{ current_lineno++; BEGIN(INITIAL); }
@@ -91,6 +91,9 @@ char *fixup(char *p)
       return p;
     case '\\':
       dst[-1]=*src++;
+      break;
+    case ' ': case '\t': case '\n':
+      --dst;
     }
 }
 
