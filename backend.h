@@ -32,6 +32,7 @@ extern SMV *be_holdSMVs;
 extern void be_emitn(int, numtype);
 extern void be_emiti(int, unsigned char *);
 extern void be_extend(int);
+extern void be_setloc(numtype);
 
 #define EMITN(bi,n) be_emitn(bi, n)
 #define EMITI(by,p) be_emiti(by, p)

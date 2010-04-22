@@ -656,7 +656,7 @@ fprintf(stderr, "\n");
       case OP_STORE(56): EMIT56(POP); break;
       case OP_STOREPB: EMITN(pfx,POP); pfx=0; break;
       case OP_STINLINEPB: EMITI(pfx,p); p+=(pfx+7)>>3; pfx=0; break;
-      case OP_ORG: { numtype a = POP; while(*current_loc < a) EMIT8(0); break;}
+      case OP_ORG: { numtype a = POP; be_setloc(a); break;}
       case OP_CNOP: { numtype b = findmsb(pfx); pfx &= (b-1);
                       while(((*current_loc)&(b-1)) != pfx) EMIT8(0); pfx=0;
                       break; }

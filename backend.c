@@ -13,6 +13,7 @@ int be_freehold;
 static int allochold;
 static int *bitbase;
 static SMV *SMVbase;
+static numtype org_set;
 
 struct section builtin_section, *all_sections, *emit_section;
 int num_sections;
@@ -143,7 +144,14 @@ void be_emiti(int by, unsigned char *p)
 
 #endif
 
-
+void be_setloc(numtype n)
+{
+  if (!org_set && emit_section == &builtin_section &&
+      builtin_section.numslices == 0) {
+    *current_loc = org_set = n;
+  } else
+    while(*current_loc < n) EMIT8(0);
+}
 
 int write_section_data(struct section *s, FILE *f)
 {
@@ -157,7 +165,7 @@ int write_section_data(struct section *s, FILE *f)
 
 int write_section_srec(struct section *s, FILE *f, char *tmpl)
 {
-  int cs, i, n, l, a=0, p;
+  int cs, i, n, l, a=org_set, p;
   if(tmpl == NULL)
     tmpl = "S1%02X%04X";
   for(n=0; n<s->numslices; n++)
@@ -218,6 +226,7 @@ void reset_sections()
     reset_section(&all_sections[n]);
   if(current_loc != NULL)
     *current_loc = 0;
+  org_set = 0;
 }
 
 void backend_init()
