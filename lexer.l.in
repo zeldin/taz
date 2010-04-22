@@ -30,7 +30,7 @@ number	{decimal}|{octal}|{hex}
 %%
 
 
-\/\*([^*]|\*+[^*/])\*+\/	{ char *p=yytext; while(*p) if(*p++=='\n') current_lineno++; }
+\/\*([^*]|\*+[^*/])\*+\/	{ char *p=yytext; while(*p) if(*p++=='\n') current_lineno++; numlines++; }
 <COMMENT>[^\n]*			;
 {trailcomment}			BEGIN(COMMENT);
 <INITIAL>{ws}*{linecomment}	BEGIN(COMMENT);
@@ -106,9 +106,9 @@ number	{decimal}|{octal}|{hex}
 {label}				{ yylval.str=yytext; return T_SYMBOL; }
 
 {ws}+	;
-<MACRO,MACRO2>\n { current_lineno++; yymore(); BEGIN(MACRO); }
+<MACRO,MACRO2>\n { current_lineno++; numlines++; yymore(); BEGIN(MACRO); }
 <MACARG>\n	{ unput('\n'); BEGIN(INITIAL); return T_EMA; }
-<*>\n	{ current_lineno++; BEGIN(INITIAL); }
+<*>\n	{ current_lineno++; numlines++; BEGIN(INITIAL); }
 ["']	{ errormsg("Unterminated string literal"); BEGIN(COMMENT); }
 .	{ errormsg("Unknown character \"%s\"", yytext); BEGIN(COMMENT); }
 
