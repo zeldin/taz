@@ -46,6 +46,7 @@ spadto		return T_SPADTO;
 signed		return T_SIGNED;
 unsigned	return T_UNSIGNED;
 wraparound	return T_WRAPAROUND;
+relative        return T_RELATIVE;
 
 \=		return T_EQ;
 \{		{ BEGIN(ENUM); return T_ENUMSTART; }
