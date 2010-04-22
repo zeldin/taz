@@ -27,7 +27,7 @@ struct stdtoken { char *str, *token; } stdtok[] = {
   { ">>", "T_SHR" },
   { "<=", "T_LE" },
   { ">=", "T_GE" },
-  { "==", "T_EQ" },
+  { "==", "T_EQL" },
   { "!=", "T_NE" },
   { "~",  "T_COMPL" },
   { "!",  "T_NOT" },

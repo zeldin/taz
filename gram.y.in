@@ -68,7 +68,7 @@ extern struct mempool symbolnamepool;
 %left  T_ADD T_SUB
 %left  T_SHL T_SHR
 %nonassoc T_LT T_LE T_GT T_GE
-%nonassoc T_EQ T_NE
+%nonassoc T_EQL T_NE
 %left  T_AND
 %left  T_XOR
 %left  T_OR
