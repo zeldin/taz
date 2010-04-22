@@ -4,6 +4,8 @@
 
 #ifdef DEBUG_MALLOC
 
+extern char *strdup(const char *);
+
 int verbose_debug_malloc = 0;
 int verbose_debug_exit = 1;
 

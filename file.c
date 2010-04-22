@@ -3,6 +3,9 @@
 #include <string.h>
 #include <stdarg.h>
 #include "taz.h"
+#ifndef NO_SMACH
+#include "smach.h"
+#endif
 
 extern void yyrestart(FILE *);
 extern void yy_switch_to_buffer(struct yy_buffer_state *);
@@ -10,7 +13,7 @@ extern struct yy_buffer_state *yy_create_buffer(FILE *, int);
 extern void yy_delete_buffer(struct yy_buffer_state *);
 extern FILE *yyin;
 
-int numerrors;
+int numerrors, numlines;
 
 static struct mempool filenamepool;
 
@@ -21,11 +24,54 @@ static struct file_info {
   struct yy_buffer_state *buffer;
   void *block;
 } *filestack;
-static int filestackdepth=0, numfileinfos=0;
+static struct file_brief {
+  const char *filename;
+  int is_macro;
+} *allfiles;
+static int filestackdepth=0, numfileinfos=0, numids=0, numfilebriefs=0;
 static int numincdirs=0, maxincdirs=0, maxincdirlen=0;
 
 int current_lineno;
 const char *current_filename, **incdir;
+
+static int make_id(const char *filename, int is_macro)
+{
+  int i;
+  for(i=0; i<numids; i++)
+    if(allfiles[i].filename == filename &&
+       allfiles[i].is_macro == is_macro)
+      return i;
+  if(numids >= numfilebriefs)
+    if(allfiles)
+      allfiles=realloc(allfiles,
+		       sizeof(struct file_brief)*(numfilebriefs<<=1));
+    else
+      allfiles=malloc(sizeof(struct file_brief)*(numfilebriefs=32));
+  allfiles[numids].filename = filename;
+  allfiles[numids].is_macro = is_macro;
+  return numids++;
+}
+
+void filestack_push(int id)
+{
+  struct file_brief *f = &allfiles[id];
+  if(filestackdepth>=numfileinfos) {
+    fprintf(stderr, "Internal error: Filestack grew in pass N???\n");
+    exit(2);
+  }
+  if(filestackdepth)
+    filestack[filestackdepth-1].lineno = current_lineno;
+  current_filename = filestack[filestackdepth].filename = f->filename;
+  filestack[filestackdepth++].file = (f->is_macro? NULL : stdout);
+}
+
+void filestack_pop()
+{
+  if(--filestackdepth) {
+    current_lineno = filestack[filestackdepth-1].lineno;
+    current_filename = filestack[filestackdepth-1].filename;
+  }
+}
 
 void process_buffer(const char *filename, int lineno,
 		    struct yy_buffer_state *buf, FILE *f, void *block)
@@ -56,6 +102,9 @@ void process_buffer(const char *filename, int lineno,
   filestack[filestackdepth].block = block;
   if((filestack[filestackdepth++].file = f))
     yyrestart(f);
+#ifndef NO_SMACH
+  smach_pushfile(make_id(filename, f == NULL));
+#endif
   current_lineno = lineno;
 }
 
@@ -146,8 +195,16 @@ int file_yywrap()
     current_lineno = filestack[filestackdepth-1].lineno;
     current_filename = filestack[filestackdepth-1].filename;
     yyin = filestack[filestackdepth-1].file;
+#ifndef NO_SMACH
+    smach_popfile();
+#endif
     return 0;
-  } else return 1;
+  } else {
+#ifndef NO_SMACH
+    smach_popfile();
+#endif
+    return 1;
+  }
 }
 
 int abort_macro()
@@ -162,6 +219,7 @@ void file_init()
 {
   initpool(&filenamepool, 1, 1000);
   filestack=NULL;
+  allfiles=NULL;
   incdir=NULL;
   filestackdepth=numfileinfos=numincdirs=maxincdirs=maxincdirlen=0;
 }
@@ -170,5 +228,6 @@ void file_end()
 {
   emptypool(&filenamepool);
   if(filestack!=NULL) free(filestack);
+  if(allfiles!=NULL) free(allfiles);
   if(incdir!=NULL) free(incdir);
 }
