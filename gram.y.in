@@ -207,7 +207,7 @@ expr_list_16 : expr_16
              | expr_list_16 T_COMMA expr_16
 
 expr_16 : expr
-  { numtype n; SMV t = checknumX($1, 16); if(evalconst(t, &n)) GEN(MKICON(((n&0xff)<<8)|((n&0xff00)>>8)), 16); else { HOLD(MKSHR(t, MKICON(8)), 8); GEN(MKAND(t, MKICON(255)), 8); } }
+  { GEN(checknumX($1, 16), 16); }
 
 const_expr : expr { numtype n; if(evalconst($1, &n)) $$ = n; else { errormsg("Expression does not compute to a constant value"); YYERROR; } }
 
