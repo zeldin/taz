@@ -9,13 +9,13 @@
 #include "smach.h"
 #include "backend.h"
 
-int checknumU(int, int);
-int checknumS(int, int);
-int checknumW(int, int);
-int checknumX(int, int);
+SMV checknumU(SMV, int);
+SMV checknumS(SMV, int);
+SMV checknumW(SMV, int);
+SMV checknumX(SMV, int);
 
 extern int falseclause;
-static struct symbol *label;
+static struct symbol *label, *dlabel;
 static int mac_argc;
 
 extern struct mempool symbolnamepool;
@@ -59,19 +59,24 @@ extern struct mempool symbolnamepool;
 %token T_IFEQ T_IFNE T_IFLT T_IFLE T_IFGT T_IFGE
 %token T_EMA
 
+%token T_BYTE
+%token T_WORD
+%token T_ORG
+%token T_CNOP
+
 <- opcodetokens ->
 <- opertokens ->
 <- stdtokens ->
 
-%right T_COMPL T_NOT
-%left  T_MUL T_DIV T_MOD
-%left  T_ADD T_SUB
-%left  T_SHL T_SHR
-%nonassoc T_LT T_LE T_GT T_GE
-%nonassoc T_EQL T_NE
-%left  T_AND
-%left  T_XOR
 %left  T_OR
+%left  T_XOR
+%left  T_AND
+%nonassoc T_EQL T_NE
+%nonassoc T_LT T_LE T_GT T_GE
+%left  T_SHL T_SHR
+%left  T_ADD T_SUB
+%left  T_MUL T_DIV T_MOD
+%right T_COMPL T_NOT
 
 %type <str> section_name section_qualifier string
 %type <num> conditional const_expr
@@ -89,7 +94,7 @@ units : implicit_section
 explicit_sections : explicit_section
 		  | explicit_sections explicit_section
 
-explicit_section : section_header implicit_section
+explicit_section : section_header statements
 
 section_header : T_SECTION section_name
 	       | T_SECTION section_name T_COMMA section_qualifier
@@ -100,31 +105,37 @@ section_qualifier : T_SYMBOL
 
 opt_end : T_END |
 
-implicit_section : statement
+implicit_section : statement0
 		 | implicit_section statement
 
-headers : header
-	| headers header
+headers : headers header
 	|
 
-statement : header
-	  | pseudo
-	  | opcode
-	  | T_LABEL {}
+statement0 : pseudo
+	   | opcode
+           | T_LABEL { if(!(label=create_symbol($1, SYMB_RELOC))) YYERROR;
+                       else { label->value.num=0xdeadbeef;
+                              smach_setsym(label, mksymbref(currloc_sym)); } }
+
+statement : statement0
+	  | header
+
+statements : statements statement
+	   |
 
 header : error
        | T_LABEL T_EQU
-		{ if(!(label=create_symbol($1, SYMB_EQU))) YYERROR; }
-	 const_expr
-		{ label->value.num=$4; }
+		{ if(!(dlabel=create_symbol($1, SYMB_EQU))) YYERROR; }
+	 expr
+		{ smach_setsym(dlabel, $4); }
        | T_LABEL T_EQ
-		{ if(!(label=create_symbol($1, SYMB_EQU))) YYERROR; }
-	 const_expr
-		{ label->value.num=$4; }
+		{ if(!(dlabel=create_symbol($1, SYMB_EQU))) YYERROR; }
+	 expr
+		{ smach_setsym(dlabel, $4); }
        | T_LABEL T_SET
-		{ if(!(label=create_symbol($1, SYMB_SET))) YYERROR; }
+		{ if(!(dlabel=create_symbol($1, SYMB_SET))) YYERROR; }
 	 const_expr
-		{ label->value.num=$4; }
+		{ smach_setsym(dlabel, $4); }
        | T_INCDIR T_STRING
 		{ add_incdir($2); }
        | T_INCLUDE T_STRING
@@ -142,7 +153,11 @@ header : error
        | T_ENDC { errormsg("Spurious endc"); YYERROR; }
        | T_ENDM { errormsg("Spurious endm"); YYERROR; }
 
-pseudo :
+pseudo
+       : T_BYTE expr_list_8
+       | T_WORD expr_list_16
+       | T_ORG expr { smach_setsym(currloc_sym, $2); }
+       | T_CNOP const_expr T_COMMA const_expr { smach_cnop($2, $4); }
 
 cond_block : cond_block statement
 	   | 
@@ -182,12 +197,28 @@ macarg	: T_MACARG
 <- enumproductions ->
 <- numericproductions ->
 
+expr_list_8 : expr_8
+            | expr_list_8 T_COMMA expr_8
+
+expr_8 : expr { GEN(checknumX($1, 8), 8); }
+       | T_STRING { { int i; for(i=0; ($1)[i]; i++) GEN(MKICON(($1)[i]), 8);} }
+
+expr_list_16 : expr_16
+             | expr_list_16 T_COMMA expr_16
+
+expr_16 : expr
+  { numtype n; SMV t = checknumX($1, 16); if(evalconst(t, &n)) GEN(MKICON(((n&0xff)<<8)|((n&0xff00)>>8)), 16); else { HOLD(MKSHR(t, MKICON(8)), 8); GEN(MKAND(t, MKICON(255)), 8); } }
+
 const_expr : expr { numtype n; if(evalconst($1, &n)) $$ = n; else { errormsg("Expression does not compute to a constant value"); YYERROR; } }
 
 expr : T_LPAR expr T_RPAR { $$ = $2; }
      | T_NUMBER { $$ = MKICON($1); }
+     | T_STRING { if(strlen($1)!=1) { errormsg("Character expression has length != 1"); YYERROR; } else { $$ = MKICON($1[0]); } }
      | T_SYMBOL
-	{ if((label=lookup_symbol($1))) $$=mksymbref(label); else if((label=create_symbol($1, SYMB_UNDEF))) $$=mksymbref(label); else YYERROR; }
+	{ if((label=lookup_symbol($1))) $$=mksymbref(label); else if((label=create_symbol(poolstring(&symbolnamepool, $1), SYMB_UNDEF))) $$=mksymbref(label); else YYERROR; }
+     | T_MUL { $$=mksymbref(currloc_sym); }
+     | T_LT expr %prec T_NOT { $$ = MKAND($2, MKICON(255)); }
+     | T_GT expr %prec T_NOT { $$ = MKSHR($2, MKICON(8)); }
      | T_SUB expr %prec T_NOT { $$ = MKNEG($2); }
      | T_ADD expr %prec T_NOT { $$ = $2; }
      | T_COMPL expr { $$ = MKCPL($2); }
@@ -209,23 +240,23 @@ string : T_STRING
 
 %%
 
-int checknumU(int val, int bits)
+SMV checknumU(SMV val, int bits)
 {
-  return val;
+  return mkchecknum(M_CHECKU, val, bits);
 }
 
-int checknumS(int val, int bits)
+SMV checknumS(SMV val, int bits)
 {
-  return val;
+  return mkchecknum(M_CHECKS, val, bits);
 }
 
-int checknumW(int val, int bits)
+SMV checknumW(SMV val, int bits)
 {
-  return val;
+  return mkchecknum(M_CHECKW, val, bits);
 }
 
-int checknumX(int val, int bits)
+SMV checknumX(SMV val, int bits)
 {
-  return val;
+  return mkchecknum(M_CHECKX, val, bits);
 }
 

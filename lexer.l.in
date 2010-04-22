@@ -19,6 +19,7 @@ decimal	[1-9][0-9]*
 octal	0[0-7]*
 hex	0[xX][0-9a-fA-f]+
 hex2	$[0-9a-fA-f]+
+binary  "%"[0-1]+
 number	{decimal}|{octal}|{hex}
 
 <- definitions ->
@@ -53,6 +54,10 @@ number	{decimal}|{octal}|{hex}
 <OPCODE>\.?[iI][nN][cC][dD][iI][rR]	{ BEGIN(OPERAND); return T_INCDIR; }
 <OPCODE>\.?[eE][nN][dD][mM]		{ BEGIN(OPERAND); return T_ENDM; }
 <OPCODE>\.?[mM][eE][xX][iI][tT]		{ BEGIN(OPERAND); return T_MEXIT; }
+<OPCODE>\.?[bB][yY][tT][eE]             { BEGIN(OPERAND); return T_BYTE; }
+<OPCODE>\.?[wW][oO][rR][dD]             { BEGIN(OPERAND); return T_WORD; }
+<OPCODE>\.?[oO][rR][gG]                 { BEGIN(OPERAND); return T_ORG; }
+<OPCODE>\.?[cC][nN][oO][pP]             { BEGIN(OPERAND); return T_CNOP; }
 <OPCODE>\.?[eE][nN][dD][cC]		{ BEGIN(COMMENT); return T_ENDC; }
 <FALSECLAUSE>\.?[eE][nN][dD][cC]	{ if(!--falseclause) { BEGIN(COMMENT); return T_ENDC; } }
 <OPCODE>\.?[iI][fF][dD]			{ BEGIN(OPERAND); return T_IFD; }
@@ -80,6 +85,7 @@ number	{decimal}|{octal}|{hex}
 
 {number}		{yylval.num=strtol(yytext, NULL, 0); return T_NUMBER;}
 {hex2}			{yylval.num=strtol(yytext+1, NULL, 16); return T_NUMBER;}
+{binary}                {yylval.num=strtol(yytext+1, NULL, 2); return T_NUMBER;}
 
 
 <- stdregexps ->
