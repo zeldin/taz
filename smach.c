@@ -40,6 +40,12 @@ static struct symbol *changed;
 #define OP_BREAK (0xc2)
 #define OP_ARITH(n) (0xc3+(n)-M_ADD)
 #define OP_EXTENDED (0xc7)
+#define OP_SETKEYVAL (0xc8)
+#define OP_GETKEYVAL (0xc9)
+#define OP_TESTU (0xca)
+#define OP_TESTS (0xcb)
+#define OP_TESTW (0xcc)
+#define OP_TESTX (0xcd)
 #define OP_LS1(n) (0xd0|((n)-1))
 #define OP_LS2(n) (0xe0|(((n)>>4)-1))
 /* #define OP_STPREFIX(n) (0xe8|(n)) */
@@ -77,7 +83,7 @@ static int regd_blks, allocated_blks;
 #define POP (STKVAL0(--stkp))
 
 static int stkp=0, saved_lineno;
-static numtype valstack[100];
+static numtype valstack[100], keyval;
 
 static SMV allocSMV()
 {
@@ -514,6 +520,66 @@ void smach_emit(SMV v, int b)
   }
 }
 
+void smach_xemit(SMV k, int t, int l, SMV v1, int b1, SMV v2, int b2)
+{
+  if(current_lineno > saved_lineno) {
+    emit_prefix(current_lineno-saved_lineno-1);
+    EMIT(OP_LINENO);
+    saved_lineno = current_lineno;
+  }
+  if(SMVelt(k,type)==M_ICON) {
+    int large=0;
+    switch(t) {
+     case M_CHECKU:
+       if(SMVelt(k,number.num)<0 || SMVelt(k,number.num)>=(1<<l))
+	 large=1;
+       break;
+     case M_CHECKS:
+       if(SMVelt(k,number.num)<-(1<<(l-1)) ||
+	  SMVelt(k,number.num)>=(1<<(l-1)))
+	 large=1;
+       break;
+     case M_CHECKW:
+       if(SMVelt(k,number.num)<1 || SMVelt(k,number.num)>(1<<l))
+	 large=1;
+       break;
+     case M_CHECKX:
+       if(SMVelt(k,number.num)<-(1<<l) || SMVelt(k,number.num)>=(1<<l))
+	 large=1;
+       break;
+    }
+    if(large)
+      smach_emit(v2, b2);
+    else
+      smach_emit(v1, b1);
+  } else {
+    emit(k);
+    EMIT(OP_SETKEYVAL);
+    emit(v1);
+    EMIT(OP_PUSH(b1));
+    emit(v2);
+    EMIT(OP_PUSH(b2));
+    emit_prefix(l);
+    switch(t) {
+    case M_CHECKU:
+      EMIT(OP_TESTU);
+      break;
+    case M_CHECKS:
+      EMIT(OP_TESTS);
+      break;
+    case M_CHECKW:
+      EMIT(OP_TESTW);
+      break;
+    case M_CHECKX:
+      EMIT(OP_TESTX);
+      break;
+    default:
+      fprintf(stderr, "Internal error: smach:xemit(%d)\n", t);
+      exit(3);
+    }
+  }
+}
+
 void smach_setsym(struct symbol *s, SMV v)
 {
   numtype n;
@@ -647,6 +713,39 @@ fprintf(stderr, "\n");
 	STKVAL(0) &= (1<<pfx)-1;
 	pfx = 0;
 	break;
+      case OP_TESTU:
+	if(keyval<0 || keyval>=(1<<pfx)) {
+	  EMITN(STKVAL(0),STKVAL(1));
+	} else {
+	  EMITN(STKVAL(2),STKVAL(3));
+	}
+	stkp -= 4;
+	pfx = 0;
+	break;
+      case OP_TESTS:
+	if(keyval<-(1<<(pfx-1)) || keyval>=(1<<(pfx-1)))
+	  EMITN(STKVAL(0),STKVAL(1));
+	else
+	  EMITN(STKVAL(2),STKVAL(3));
+	stkp -= 4;
+	pfx = 0;
+	break;
+      case OP_TESTW:
+	if(keyval<1 || keyval>(1<<pfx))
+	  EMITN(STKVAL(0),STKVAL(1));
+	else
+	  EMITN(STKVAL(2),STKVAL(3));
+	stkp -= 4;
+	pfx = 0;
+	break;
+      case OP_TESTX:
+	if(keyval<-(1<<pfx) || keyval>=(1<<pfx))
+	  EMITN(STKVAL(0),STKVAL(1));
+	else
+	  EMITN(STKVAL(2),STKVAL(3));
+	stkp -= 4;
+	pfx = 0;
+	break;
 	/*
       case OP_STPREFIX(1): EMIT1(pfx); pfx=0; break;
       case OP_STPREFIX(2): EMIT2(pfx); pfx=0; break;
@@ -699,6 +798,9 @@ fprintf(stderr, "\n");
 	  pfx=0;
 	  break;
 	}
+
+      case OP_SETKEYVAL: keyval = POP; break;
+      case OP_GETKEYVAL: PUSH(keyval); break;
 
       default:
 	fprintf(stderr, "Internal error: smach:smach_execute(%02x)\n", o);

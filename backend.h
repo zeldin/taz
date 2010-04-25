@@ -17,6 +17,7 @@ extern void backend_init();
 extern void backend_end();
 extern void backend_finalize();
 extern void begen(SMV v, int b);
+extern void bexgen(SMV k, int t, int l, SMV v1, int b1, SMV v2, int b2);
 extern void behold(SMV v, int b);
 extern void reset_sections();
 extern int write_section_data(struct section *s, FILE *f);
@@ -27,6 +28,7 @@ extern int *be_holdbits;
 extern SMV *be_holdSMVs;
 
 #define GEN(x,b) begen(x,b)
+#define XGEN(k,t,l,x1,b1,x2,b2) bexgen(k,t,l,x1,b1,x2,b2)
 #define HOLD(x,b) ((--be_freehold)?(((void)(*be_holdbits++=b)),((void)(*be_holdSMVs++=x))):behold(x,b))
 
 extern void be_emitn(int, numtype);

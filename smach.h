@@ -34,6 +34,7 @@ extern SMV mkchecknum(int, SMV, int);
 extern int evalconst(SMV, numtype *);
 extern void smach_flush();
 extern void smach_emit(SMV, int);
+extern void smach_xemit(SMV, int, int, SMV, int, SMV, int);
 extern void smach_setsym(struct symbol *, SMV);
 extern void smach_cnop(numtype, numtype);
 extern void smach_term();
