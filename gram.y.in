@@ -108,8 +108,11 @@ opt_end : T_END |
 implicit_section : statement0
 		 | implicit_section statement
 
-headers : headers header
+headers : headers headerx
 	|
+
+headerx : header
+	| spurious_endc
 
 statement0 : pseudo
 	   | opcode
@@ -117,11 +120,16 @@ statement0 : pseudo
                        else { label->value.num=0xdeadbeef;
                               smach_setsym(label, mksymbref(currloc_sym)); } }
 
-statement : statement0
-	  | header
+statement : statement1
+	  | spurious_endc
+
+statement1 : statement0
+	   | header
 
 statements : statements statement
 	   |
+
+spurious_endc : T_ENDC { errormsg("Spurious endc"); YYERROR; }
 
 header : error
        | T_LABEL T_EQU
@@ -150,7 +158,6 @@ header : error
        | T_MAC { mac_argc=0; } macargs_opt T_EMA
 		{ invoke_macro($1, mac_argc); }
        | T_MEXIT { if(!abort_macro()) { errormsg("Spurious mexit"); YYERROR; }}
-       | T_ENDC { errormsg("Spurious endc"); YYERROR; }
        | T_ENDM { errormsg("Spurious endm"); YYERROR; }
 
 pseudo
@@ -159,7 +166,7 @@ pseudo
        | T_ORG expr { smach_setsym(currloc_sym, $2); }
        | T_CNOP const_expr T_COMMA const_expr { smach_cnop($2, $4); }
 
-cond_block : cond_block statement
+cond_block : cond_block statement1
 	   | 
 
 conditional
