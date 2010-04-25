@@ -1,18 +1,18 @@
 #define M_ICON 1
 #define M_SYMB 2
-#define M_NEG  3
-#define M_CPL  4
-#define M_NOT  5
-#define M_ADD  6
-#define M_SUB  7
-#define M_MUL  8
-#define M_DIV  9
-#define M_MOD  10
-#define M_AND  11
-#define M_OR   12
-#define M_XOR  13
-#define M_SHL  14
-#define M_SHR  15
+#define M_ADD  3
+#define M_SUB  4
+#define M_AND  5
+#define M_OR   6
+#define M_XOR  7
+#define M_SHL  8
+#define M_SHR  9
+#define M_MUL  10
+#define M_DIV  11
+#define M_MOD  12
+#define M_NEG  13
+#define M_CPL  14
+#define M_NOT  15
 #define M_LS1  16
 #define M_LS2  17
 #define M_CHECKU 18
@@ -20,8 +20,8 @@
 #define M_CHECKW 20
 #define M_CHECKX 21
 
+#define M_MAX_BINARY  M_MOD
 #define M_MAX_UNARY   M_NOT
-#define M_MAX_BINARY  M_SHR
 
 typedef int SMV;
 

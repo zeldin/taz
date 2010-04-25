@@ -38,7 +38,8 @@ static struct symbol *changed;
 #define OP_LOADL (0xc0)
 #define OP_STOREL (0xc1)
 #define OP_BREAK (0xc2)
-#define OP_ARITH(n) (0xc3+(n)-M_NEG)
+#define OP_ARITH(n) (0xc3+(n)-M_ADD)
+#define OP_EXTENDED (0xc7)
 #define OP_LS1(n) (0xd0|((n)-1))
 #define OP_LS2(n) (0xe0|(((n)>>4)-1))
 /* #define OP_STPREFIX(n) (0xe8|(n)) */
@@ -388,13 +389,18 @@ static void emit_inline(numtype n, int b)
 
 static void emit(SMV v)
 {
-  if(SMVelt(v,type)>=M_NEG && SMVelt(v,type)<=M_MAX_BINARY) {
-    if(SMVelt(v,type)>M_MAX_UNARY) {
+  if(SMVelt(v,type)>=M_ADD && SMVelt(v,type)<=M_MAX_UNARY) {
+    if(SMVelt(v,type)<=M_MAX_BINARY) {
       emit(SMVelt(v,binary).v1);
       emit(SMVelt(v,binary).v2);
     } else
       emit(SMVelt(v,unary).v);
-    EMIT(OP_ARITH(SMVelt(v,type)));
+    if(SMVelt(v,type)<=M_OR)
+      EMIT(OP_ARITH(SMVelt(v,type)));
+    else {
+      emit_prefix(SMVelt(v,type));
+      EMIT(OP_EXTENDED);
+    }
   } else switch(SMVelt(v,type)) {
   case M_ICON:
     {
@@ -573,19 +579,27 @@ fprintf(stderr, "\n");
       if(o&0x40) switch(o) {
       case OP_BREAK:
 	return pfx;
-      case OP_ARITH(M_NEG): STKVAL(0)=-STKVAL(0); break;
-      case OP_ARITH(M_CPL): STKVAL(0)=~STKVAL(0); break;
-      case OP_ARITH(M_NOT): STKVAL(0)=!STKVAL(0); break;
       case OP_ARITH(M_ADD): STKVAL(1)+=STKVAL(0); (void)POP; break;
       case OP_ARITH(M_SUB): STKVAL(1)-=STKVAL(0); (void)POP; break;
-      case OP_ARITH(M_MUL): STKVAL(1)*=STKVAL(0); (void)POP; break;
-      case OP_ARITH(M_DIV): if(STKVAL(0)) STKVAL(1)/=STKVAL(0); else errormsg("Division by zero"); (void)POP; break;
-      case OP_ARITH(M_MOD): if(STKVAL(0)) STKVAL(1)%=STKVAL(0); else errormsg("Division by zero"); (void)POP; break;
       case OP_ARITH(M_AND): STKVAL(1)&=STKVAL(0); (void)POP; break;
       case OP_ARITH(M_OR): STKVAL(1)|=STKVAL(0); (void)POP; break;
-      case OP_ARITH(M_XOR): STKVAL(1)^=STKVAL(0); (void)POP; break;
-      case OP_ARITH(M_SHL): STKVAL(1)<<=STKVAL(0); (void)POP; break;
-      case OP_ARITH(M_SHR): STKVAL(1)>>=STKVAL(0); (void)POP; break;
+      case OP_EXTENDED:
+	switch(pfx) {
+	case M_XOR: STKVAL(1)^=STKVAL(0); (void)POP; break;
+	case M_SHL: STKVAL(1)<<=STKVAL(0); (void)POP; break;
+	case M_SHR: STKVAL(1)>>=STKVAL(0); (void)POP; break;
+	case M_MUL: STKVAL(1)*=STKVAL(0); (void)POP; break;
+	case M_DIV: if(STKVAL(0)) STKVAL(1)/=STKVAL(0); else errormsg("Division by zero"); (void)POP; break;
+	case M_MOD: if(STKVAL(0)) STKVAL(1)%=STKVAL(0); else errormsg("Division by zero"); (void)POP; break;
+	case M_NEG: STKVAL(0)=-STKVAL(0); break;
+	case M_CPL: STKVAL(0)=~STKVAL(0); break;
+	case M_NOT: STKVAL(0)=!STKVAL(0); break;
+	default:
+	  fprintf(stderr, "Internal error: smach:smach_execute_extended(%02x)\n", pfx);
+	  exit(3);
+	}
+	pfx = 0;
+	break;
       case OP_LS1(1): STKVAL(0)<<=1; break;
       case OP_LS1(2): STKVAL(0)<<=2; break;
       case OP_LS1(3): STKVAL(0)<<=3; break;
