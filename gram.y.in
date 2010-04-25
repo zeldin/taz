@@ -135,7 +135,7 @@ header : error
        | T_LABEL T_SET
 		{ if(!(dlabel=create_symbol($1, SYMB_SET))) YYERROR; }
 	 const_expr
-		{ smach_setsym(dlabel, $4); }
+		{ smach_setsym(dlabel, MKICON($4)); }
        | T_INCDIR T_STRING
 		{ add_incdir($2); }
        | T_INCLUDE T_STRING
