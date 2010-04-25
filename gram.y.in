@@ -80,7 +80,7 @@ extern struct mempool symbolnamepool;
 
 %type <str> section_name section_qualifier string
 %type <num> conditional const_expr
-%type <exp> expr
+%type <exp> expr expr0
 
 <- classtypes ->
 
@@ -207,7 +207,7 @@ macarg	: T_MACARG
 expr_list_8 : expr_8
             | expr_list_8 T_COMMA expr_8
 
-expr_8 : expr { GEN(checknumX($1, 8), 8); }
+expr_8 : expr0 { GEN(checknumX($1, 8), 8); }
        | T_STRING { { int i; for(i=0; ($1)[i]; i++) GEN(MKICON(($1)[i]), 8);} }
 
 expr_list_16 : expr_16
@@ -218,29 +218,31 @@ expr_16 : expr
 
 const_expr : expr { numtype n; if(evalconst($1, &n)) $$ = n; else { errormsg("Expression does not compute to a constant value"); YYERROR; } }
 
-expr : T_LPAR expr T_RPAR { $$ = $2; }
-     | T_NUMBER { $$ = MKICON($1); }
+expr : expr0
      | T_STRING { if(strlen($1)!=1) { errormsg("Character expression has length != 1"); YYERROR; } else { $$ = MKICON($1[0]); } }
-     | T_SYMBOL
+
+expr0 : T_LPAR expr T_RPAR { $$ = $2; }
+      | T_NUMBER { $$ = MKICON($1); }
+      | T_SYMBOL
 	{ if((label=lookup_symbol($1))) $$=mksymbref(label); else if((label=create_symbol(poolstring(&symbolnamepool, $1), SYMB_UNDEF))) $$=mksymbref(label); else YYERROR; }
-     | T_MUL { $$=mksymbref(currloc_sym); }
-     | T_LT expr %prec T_NOT { $$ = MKAND($2, MKICON(255)); }
-     | T_GT expr %prec T_NOT { $$ = MKSHR($2, MKICON(8)); }
-     | T_SUB expr %prec T_NOT { $$ = MKNEG($2); }
-     | T_ADD expr %prec T_NOT { $$ = $2; }
-     | T_COMPL expr { $$ = MKCPL($2); }
-     | T_NOT expr { $$ = MKNOT($2); }
-     | expr T_ADD expr { $$ = MKADD($1,$3); }
-     | expr T_SUB expr { $$ = MKSUB($1,$3); }
-     | expr T_MUL expr { $$ = MKMUL($1,$3); }
-     | expr T_DIV expr { $$ = MKDIV($1,$3); }
-     | expr T_MOD expr { $$ = MKMOD($1,$3); }
-     | expr T_AND expr { $$ = MKAND($1,$3); }
-     | expr T_OR  expr { $$ = MKOR($1,$3); }
-     | expr T_NOT expr %prec T_OR { $$ = MKOR($1,$3); }
-     | expr T_XOR expr { $$ = MKXOR($1,$3); }
-     | expr T_SHL expr { $$ = MKSHL($1,$3); }
-     | expr T_SHR expr { $$ = MKSHR($1,$3); }
+      | T_MUL { $$=mksymbref(currloc_sym); }
+      | T_LT expr %prec T_NOT { $$ = MKAND($2, MKICON(255)); }
+      | T_GT expr %prec T_NOT { $$ = MKSHR($2, MKICON(8)); }
+      | T_SUB expr %prec T_NOT { $$ = MKNEG($2); }
+      | T_ADD expr %prec T_NOT { $$ = $2; }
+      | T_COMPL expr { $$ = MKCPL($2); }
+      | T_NOT expr { $$ = MKNOT($2); }
+      | expr T_ADD expr { $$ = MKADD($1,$3); }
+      | expr T_SUB expr { $$ = MKSUB($1,$3); }
+      | expr T_MUL expr { $$ = MKMUL($1,$3); }
+      | expr T_DIV expr { $$ = MKDIV($1,$3); }
+      | expr T_MOD expr { $$ = MKMOD($1,$3); }
+      | expr T_AND expr { $$ = MKAND($1,$3); }
+      | expr T_OR  expr { $$ = MKOR($1,$3); }
+      | expr T_NOT expr %prec T_OR { $$ = MKOR($1,$3); }
+      | expr T_XOR expr { $$ = MKXOR($1,$3); }
+      | expr T_SHL expr { $$ = MKSHL($1,$3); }
+      | expr T_SHR expr { $$ = MKSHR($1,$3); }
 
 string : T_STRING
 	{ $$ = poolstring(&symbolnamepool, $1); }
