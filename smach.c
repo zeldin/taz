@@ -523,6 +523,7 @@ void smach_setsym(struct symbol *s, SMV v)
     emit_symprefix(s);
     EMIT(OP_STOREL);
   }
+  smach_flush();
 }
 
 void smach_cnop(numtype offs, numtype modulo)
@@ -535,6 +536,7 @@ void smach_cnop(numtype offs, numtype modulo)
     emit_prefix(modulo | offs);
     EMIT(OP_CNOP);
   }
+  smach_flush();
 }
 
 void smach_term()
