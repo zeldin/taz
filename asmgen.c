@@ -21,6 +21,7 @@
 VT std_tokens, auto_tokens, opcode_tokens;
 
 int maxrecurse = 20;
+int magslot = 0;
 
 struct stdtoken { char *str, *token; } stdtok[] = {
   { "<<", "T_SHL" },
@@ -109,7 +110,10 @@ int enum_checkbits(VT e, int b)
 void print_shifted(FILE *f, VT bs, int b)
 {
   if(!b) {
-    fprintf(f, "$%d", bs->xbitslice.slot);
+    if(bs->xbitslice.slot == magslot)
+      fprintf(f, "KEYVAL");
+    else
+      fprintf(f, "$%d", bs->xbitslice.slot);
   } else if(b<=16) {
     fprintf(f, "MKLS1(");
     print_shifted(f, bs, 0);
@@ -180,6 +184,84 @@ int print_slicedexp(FILE *f, VT bss)
   return totbits;
 }
 
+VT find_inferior_class(VT t1, VT t2)
+{
+  VT i1, i2;
+  int n=0;
+
+  for(i1=t1->xtemplate.tokens->xlist.head,
+	i2=t2->xtemplate.tokens->xlist.head;
+      i1!=NIL && i2!=NIL;
+      i1=i1->xpair.right, i2=i2->xpair.right) {
+    VT tok1=i1->xpair.left, tok2=i2->xpair.left;
+    ++n;
+    if(tok1->type == XCLASS) {
+      if(strcmp(tok1->xclass.str->xstring.str, tok2->xclass.str->xstring.str)) {
+	VT cls1=mapget(classes,tok1->xclass.str);
+	VT cls2=mapget(classes,tok2->xclass.str);
+	if(cls1->xnumeric.bits != cls2->xnumeric.bits) {
+	  magslot = n;
+	  return cls2;
+	}
+      }
+    }
+  }
+
+  fprintf(stderr, "Internal error\n");
+  exit(2);
+}
+
+int mergable(VT t1, VT t2)
+{
+  int mergemode = 0;
+  VT i1, i2;
+
+  /* Fixme... */
+  if(t1->xtemplate.extras->xlist.head != NIL ||
+     t2->xtemplate.extras->xlist.head != NIL)
+    return 0;
+
+  for(i1=t1->xtemplate.tokens->xlist.head,
+	i2=t2->xtemplate.tokens->xlist.head;
+      i1!=NIL && i2!=NIL;
+      i1=i1->xpair.right, i2=i2->xpair.right) {
+    VT tok1=i1->xpair.left, tok2=i2->xpair.left;
+    if(tok1->type!=tok2->type)
+      return 0;
+    switch(tok1->type) {
+    case XSTRING:
+      if(strcmp(tok1->xstring.str, tok2->xstring.str))
+	return 0;
+      break;
+    case XCLASS:
+      if(strcmp(tok1->xclass.str->xstring.str, tok2->xclass.str->xstring.str)) {
+	VT cls1=mapget(classes,tok1->xclass.str);
+	VT cls2=mapget(classes,tok2->xclass.str);
+	if(cls1->type != cls2->type || cls1->type != XNUMERIC ||
+	   cls1->xnumeric.signedness != cls2->xnumeric.signedness ||
+	   cls1->xnumeric.relative != cls2->xnumeric.relative)
+	  return 0;
+	if(cls1->xnumeric.bits == cls2->xnumeric.bits)
+	  break;
+	if(mergemode)
+	  return 0;
+	if(cls1->xnumeric.bits < cls2->xnumeric.bits)
+	  mergemode = -1;
+	else
+	  mergemode = 1;
+      }
+      break;
+    default:
+      return 0;
+    }
+  }
+
+  if(i1!=NIL || i2!=NIL)
+    return 0;
+
+  return mergemode;
+}
+
 void gen_productions(FILE *f, int mask, VT tl, char *name)
 {
   VT i, i2, t, tok, bss;
@@ -188,6 +270,8 @@ void gen_productions(FILE *f, int mask, VT tl, char *name)
   fprintf(f, "\n%s\n", (name==NULL? "opcode":name));
   LISTITER(tl, i, t) {
     xassert(t, XTEMPLATE);
+    if(t->xtemplate.parent != NIL)
+      continue;
     fprintf(f, " %c", (n++? '|':':'));
     LISTITER(t->xtemplate.tokens, i2, tok) {
       if(tok->type==XCLASS) {
@@ -205,11 +289,22 @@ void gen_productions(FILE *f, int mask, VT tl, char *name)
       fprintf(f, ",%d); ", print_slicedexp(f, bss));
     }
     if(name==NULL) {
-      if(t->xtemplate.primary->xlist.num>0) {
+      if(t->xtemplate.next != NIL) {
+	VT mcls=find_inferior_class(t,t->xtemplate.next);
+	fprintf(f, "XGEN($%d,M_CHECK%c,%d,",magslot,
+		mcls->xnumeric.signedness,mcls->xnumeric.bits);
+	fprintf(f, ",%d,", print_slicedexp(f, t->xtemplate.next->xtemplate.primary));
+	fprintf(f, ",%d);", print_slicedexp(f, t->xtemplate.primary));
+      } else if(t->xtemplate.primary->xlist.num>0) {
 	fprintf(f, "GEN(");
 	fprintf(f, ",%d);", print_slicedexp(f, t->xtemplate.primary));
       }
+      magslot=0;
     } else {
+      if(t->xtemplate.next != NIL) {
+	fprintf(stderr, "Magnitude sensitive operands in template classes not supported.\n");
+	exit(1);
+      }
       fprintf(f, "$$ = ");
       print_slicedexp(f, t->xtemplate.primary);
       fprintf(f, ";");
@@ -733,6 +828,31 @@ void crunchtemplate(VT tl, char *name)
 	fprintf(stderr, " defined but not used in %s\n", name);
       }
     }
+  }
+
+  /* Group magnitude sensitive operands */
+  LISTITER(tl,i1,t) {
+    if(t->xtemplate.parent==NIL && t->xtemplate.next==NIL)
+      for(i2=i1->xpair.right; i2!=NIL; i2=i2->xpair.right) {
+	VT t2 = i2->xpair.left;
+	int n;
+	if(t2->xtemplate.parent==NIL && t2->xtemplate.next==NIL &&
+	   (n=mergable(t, t2))) {
+	  if(t->xtemplate.parent!=NIL || t->xtemplate.next!=NIL) {
+	    fprintf(stderr, "X-way merge not implemented\n");
+	    exit(1);
+	  }
+	  if(n<0) {
+	    /* t has the narrower type, make it the child */
+	    t->xtemplate.parent = t2;
+	    t2->xtemplate.next = t;
+	  } else {
+	    /* t has the wider type, make it the parent */
+	    t->xtemplate.next = t2;
+	    t2->xtemplate.parent = t;
+	  }
+	}
+      }
   }
 }
 

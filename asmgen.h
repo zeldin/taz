@@ -55,7 +55,7 @@ struct xbitslice {
 
 struct xtemplate {
   int type;
-  union xany *primary, *extras, *tokens;
+  union xany *primary, *extras, *tokens, *parent, *next;
 };
 #define XTEMPLATE 8
 

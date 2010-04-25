@@ -161,6 +161,8 @@ VT mktemplate(VT p, VT e, VT tk)
   t->xtemplate.primary=p;
   t->xtemplate.extras=e;
   t->xtemplate.tokens=tk;
+  t->xtemplate.parent=NIL;
+  t->xtemplate.next=NIL;
   return t;
 }
 

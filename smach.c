@@ -84,6 +84,7 @@ static int regd_blks, allocated_blks;
 
 static int stkp=0, saved_lineno;
 static numtype valstack[100], keyval;
+static SMV keyval_smv;
 
 static SMV allocSMV()
 {
@@ -358,6 +359,8 @@ void smach_dump(FILE *f, SMV v)
   case M_CHECKX:
     fprintf(f, "X%d(", SMVelt(v, ls).n); smach_dump(f, SMVelt(v, ls).v);
     fprintf(f, ")"); break;
+  case M_KEYVAL:
+    fprintf(f, "[]"); break;
   default:
     fprintf(f, "?%d?", SMVelt(v,type));
   }
@@ -461,6 +464,9 @@ static void emit(SMV v)
     emit_prefix(SMVelt(v,ls).n);
     EMIT(OP_CHECKX);
     break;
+  case M_KEYVAL:
+    EMIT(OP_GETKEYVAL);
+    break;
   default:
     fprintf(stderr, "Internal error: smach:emit(%d)\n", SMVelt(v,type));
     exit(3);
@@ -520,8 +526,9 @@ void smach_emit(SMV v, int b)
   }
 }
 
-void smach_xemit(SMV k, int t, int l, SMV v1, int b1, SMV v2, int b2)
+void smach_xemit(int t, int l, SMV v1, int b1, SMV v2, int b2)
 {
+  SMV k = keyval_smv;
   if(current_lineno > saved_lineno) {
     emit_prefix(current_lineno-saved_lineno-1);
     EMIT(OP_LINENO);
@@ -553,8 +560,6 @@ void smach_xemit(SMV k, int t, int l, SMV v1, int b1, SMV v2, int b2)
     else
       smach_emit(v1, b1);
   } else {
-    emit(k);
-    EMIT(OP_SETKEYVAL);
     emit(v1);
     EMIT(OP_PUSH(b1));
     emit(v2);
@@ -853,3 +858,21 @@ void smach_end()
   }
   if(SMVs) free(SMVs);
 }
+
+void smach_setkeyval(SMV k)
+{
+  if(SMVelt(k,type)==M_ICON) {
+    keyval_smv = k;
+  } else {
+    emit(k);
+    EMIT(OP_SETKEYVAL);
+    keyval_smv=allocSMV();
+    SMVelt(keyval_smv,type)=M_KEYVAL;
+  }
+}
+
+SMV smach_getkeyval()
+{
+  return keyval_smv;
+}
+
