@@ -18,7 +18,12 @@
 #include "taz.h"
 #include "asmgen.h"
 
+#define INLINE_CLASSES
+
 VT std_tokens, auto_tokens, opcode_tokens;
+#ifdef INLINE_CLASSES
+VT *nslots = NULL;
+#endif
 
 int maxrecurse = 20;
 int magslot = 0;
@@ -107,13 +112,36 @@ int enum_checkbits(VT e, int b)
   return 1;
 }
 
+#ifdef INLINE_CLASSES
+void print_slot(FILE *f, int s)
+{
+  VT cls;
+  if(nslots == NULL || (cls = nslots[s]) == NIL) {
+      fprintf(f, "$%d", s);
+      return;
+  }
+
+  if(cls->xnumeric.relative != -1)
+    fprintf(f, "checknum%c(MKSUB($%d,MKADD(mksymbref(currloc_sym),MKICON(%d))),%d)",
+	    cls->xnumeric.signedness, s, cls->xnumeric.relative,
+	    cls->xnumeric.bits);	  
+  else
+    fprintf(f, "checknum%c($%d,%d)",
+	    cls->xnumeric.signedness, s, cls->xnumeric.bits);
+}
+#endif
+
 void print_shifted(FILE *f, VT bs, int b)
 {
   if(!b) {
     if(bs->xbitslice.slot == magslot)
       fprintf(f, "KEYVAL");
     else
+#ifdef INLINE_CLASSES
+      print_slot(f, bs->xbitslice.slot);
+#else
       fprintf(f, "$%d", bs->xbitslice.slot);
+#endif
   } else if(b<=16) {
     fprintf(f, "MKLS1(");
     print_shifted(f, bs, 0);
@@ -269,12 +297,24 @@ void gen_productions(FILE *f, int mask, VT tl, char *name)
 
   fprintf(f, "\n%s\n", (name==NULL? "opcode":name));
   LISTITER(tl, i, t) {
+    int nt=0;
     xassert(t, XTEMPLATE);
     if(t->xtemplate.parent != NIL)
       continue;
+#ifdef INLINE_CLASSES
+    nslots = calloc(t->xtemplate.tokens->xlist.num+1, sizeof(VT));
+#endif
     fprintf(f, " %c", (n++? '|':':'));
     LISTITER(t->xtemplate.tokens, i2, tok) {
+      ++nt;
       if(tok->type==XCLASS) {
+#ifdef INLINE_CLASSES
+	VT cls1=mapget(classes,tok->xclass.str);
+	if(cls1->type == XNUMERIC) {
+	  nslots[nt] = cls1;
+	  fprintf(f, " expr");
+	} else
+#endif
 	fprintf(f, " c_%s", tok->xclass.str->xstring.str);
       } else if(tok->type==XNUMBER) {
 	fprintf(f, " number%d", tok->xnumber.num);
@@ -291,8 +331,14 @@ void gen_productions(FILE *f, int mask, VT tl, char *name)
     if(name==NULL) {
       if(t->xtemplate.next != NIL) {
 	VT mcls=find_inferior_class(t,t->xtemplate.next);
+#ifdef INLINE_CLASSES
+	fprintf(f, "XGEN(");
+	print_slot(f, magslot);
+	fprintf(f, ",M_CHECK%c,%d,",mcls->xnumeric.signedness,mcls->xnumeric.bits);
+#else
 	fprintf(f, "XGEN($%d,M_CHECK%c,%d,",magslot,
 		mcls->xnumeric.signedness,mcls->xnumeric.bits);
+#endif
 	fprintf(f, ",%d,", print_slicedexp(f, t->xtemplate.next->xtemplate.primary));
 	fprintf(f, ",%d);", print_slicedexp(f, t->xtemplate.primary));
       } else if(t->xtemplate.primary->xlist.num>0) {
@@ -310,6 +356,10 @@ void gen_productions(FILE *f, int mask, VT tl, char *name)
       fprintf(f, ";");
     }
     fprintf(f, " }\n");
+#ifdef INLINE_CLASSES
+    free(nslots);
+    nslots = NULL;
+#endif
   }
 }
 
@@ -352,6 +402,7 @@ void gen_output(FILE *f, int mask)
 	fprintf(f, "%%type <num> %s\n", buf);
     } else {
       xassert(cls, XNUMERIC);
+#ifndef INLINE_CLASSES
       if(mask&M_NUMPROD) {
 	fprintf(f, "\n%s : expr\n", buf);
 	if(cls->xnumeric.relative != -1)
@@ -364,6 +415,7 @@ void gen_output(FILE *f, int mask)
       }
       if(mask&M_CLASSTYPES)
 	fprintf(f, "%%type <exp> %s\n", buf);      
+#endif
     }
   }
 
