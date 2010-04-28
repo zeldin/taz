@@ -329,7 +329,7 @@ void smach_dump_binary(FILE *f, SMV v, char *o)
 void smach_dump(FILE *f, SMV v)
 {
   switch(SMVelt(v,type)) {
-  case M_ICON: fprintf(f, "%ld", SMVelt(v, number).num); break;
+  case M_ICON: fprintf(f, "%jd", SMVelt(v, number).num); break;
   case M_SYMB: fprintf(f, "%s", SMVelt(v, symbol).symb->name); break;
   case M_NEG: fprintf(f, "-"); smach_dump(f, SMVelt(v, unary).v); break;
   case M_CPL: fprintf(f, "~"); smach_dump(f, SMVelt(v, unary).v); break;
@@ -666,7 +666,7 @@ fprintf(stderr, "\n");
 	case M_CPL: STKVAL(0)=~STKVAL(0); break;
 	case M_NOT: STKVAL(0)=!STKVAL(0); break;
 	default:
-	  fprintf(stderr, "Internal error: smach:smach_execute_extended(%02x)\n", pfx);
+	  fprintf(stderr, "Internal error: smach:smach_execute_extended(%jd)\n", pfx);
 	  exit(3);
 	}
 	pfx = 0;

@@ -10,6 +10,15 @@ int maxrecurse=100;
 extern int optind;
 extern char *optarg;
 
+static char *gen_basename(char *fn)
+{
+  char *r = strrchr(fn, '/');
+  if(r != NULL)
+    return r+1;
+  else
+    return fn;
+}
+
 int main(int argc, char *argv[])
 {
   extern int yyparse(void);
@@ -72,13 +81,14 @@ int main(int argc, char *argv[])
       if(numerrors)
 	rc = 1;
       else {
-	char *p, *fn = malloc(strlen(argv[i])+5);
+	char *base = gen_basename(argv[i]);
+	char *p, *fn = malloc(strlen(base)+5);
 	FILE *f;
 	if(fn == NULL) {
 	  fprintf(stderr, "Fatal: Out of memory!\n");
 	  exit(2);
 	}
-	strcpy(fn, argv[i]);
+	strcpy(fn, base);
 	if((p = strrchr(fn, '.')) != NULL)
 	  *p = '\0';
 	strcat(fn, (hexout? (ihex?".ihx":".srec"):".bin"));
