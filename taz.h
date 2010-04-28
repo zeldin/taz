@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdint.h>
 
 #ifndef TRUE
 #define TRUE (0==0)
@@ -12,7 +13,7 @@
 #define NULL ((void*)0)
 #endif
 
-typedef long numtype;
+typedef intmax_t numtype;
 
 
 #ifdef DEBUG_MALLOC

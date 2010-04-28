@@ -160,7 +160,7 @@ void print_shifted(FILE *f, VT bs, int b)
 int print_slicedexp(FILE *f, VT bss)
 {
   VT i, bs;
-  long s=0;
+  intmax_t s=0;
   int totbits=0, ne=0, no=0, cc=0, nn;
 
   LISTITER(bss, i, bs) {
@@ -169,7 +169,7 @@ int print_slicedexp(FILE *f, VT bss)
     if(bs->xbitslice.bits<0) xwrong();
     totbits+=bs->xbitslice.bits;
     if(bs->xbitslice.classname==NIL)
-      s|=bs->xbitslice.value<<bs->xbitslice.offs;
+      s|=((intmax_t)bs->xbitslice.value)<<bs->xbitslice.offs;
     else if(bs->xbitslice.classname->type==XENUM)
       ne++;
     else
@@ -180,7 +180,7 @@ int print_slicedexp(FILE *f, VT bss)
     fprintf(f, "MKOR(");
   if(s || ne) {
     fprintf(f, "MKICON(");
-    if(s) { fprintf(f, "%ldl", s); cc++; }
+    if(s) { fprintf(f, "%jdlu", s); cc++; }
     LISTITER(bss, i, bs) {
       if(bs->xbitslice.classname!=NIL &&
 	 bs->xbitslice.classname->type==XENUM) {
