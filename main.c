@@ -43,7 +43,7 @@ int main(int argc, char *argv[])
       hexout=1;
       break;
     case 'V':
-      fprintf(stderr, TARGET" v1.9 by Marcus Comstedt <marcus@mc.pp.se>\n");
+      fprintf(stderr, TARGET" v1.10 by Marcus Comstedt <marcus@mc.pp.se>\n");
       break;
     case 'I':
       add_incdir(optarg);
