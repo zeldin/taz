@@ -50,9 +50,7 @@ aglexer.c : aglexer.l
 	$(LEX) -t $^ > $@
 
 aggram.c aggram.h : aggram.y
-	$(YACC) -d $^ 
-	mv y.tab.c aggram.c
-	mv y.tab.h aggram.h
+	$(YACC) -d -o aggram.c $^ 
 
 sieve : sieve.o
 
@@ -69,9 +67,7 @@ lexer.c : lexer.l
 	$(LEX) -t $^ > $@
 
 gram.c gram.h : gram.y
-	$(YACC) -d -v $^ 
-	mv y.tab.c gram.c
-	mv y.tab.h gram.h
+	$(YACC) -d -v -o gram.c $^ 
 
 lexer.o : lexer.c gram.h taz.h smach.h
 
