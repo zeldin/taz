@@ -15,6 +15,7 @@ ws	[ \t]
 number	(0[xX][0-9a-fA-f]+)|([1-9][0-9]*)|(0[0-7]*)
 class	[A-Z]
 var	[a-z]
+var_	[a-z_]
 
 %s ENUM
 %x IGN T0 T1 T2
@@ -67,13 +68,13 @@ relative        return T_RELATIVE;
 <T0,T1>{var}+	{ char *p,v=yytext[0]; for(p=yytext; p; p++) if(*p!=v) break; if(*p)
 		    yyless((p-yytext)); yylval.str=yytext; BEGIN(T1); return T_VARBITS; }
 <T0,T1>{class}{var}?	{ BEGIN(T1); yylval.str=yytext; return T_CLASSBITS; }
-<T2>\{{class}{var}\}	{ yytext[3]='\0'; yylval.str=yytext; return T_TEMPCLASS; }
+<T2>\{{class}{var_}\}	{ yytext[3]='\0'; yylval.str=yytext; return T_TEMPCLASS; }
 <T2>\{		{ errormsg("Illegal class expression"); }
 <T2>{ws}+	;
 <T2>\n		{ current_lineno++; BEGIN(T0); }
 <T2>{number}	{ yylval.num=strtol(yytext, NULL, 0); return T_TEMPNUMTOK; }
-<T2>{class}{var}	{ yylval.str=yytext; return T_TEMPCLASS; }
-<T2>(([^ \t\n{\\A-Z0-9]|\\.|[A-Z]+[^a-z{ \t\n])+([A-Z]+[^a-z{])?|[A-Z]+[^a-z{])	{ if(yytext[yyleng-1]=='\n') { current_lineno++; BEGIN(T0); } yylval.str=strdup(fixup(yytext)); return T_TEMPLITTOK; }
+<T2>{class}{var_}	{ yylval.str=yytext; return T_TEMPCLASS; }
+<T2>(([^ \t\n{\\A-Z0-9]|\\.|[A-Z]+[^a-z_{ \t\n])+([A-Z]+[^a-z_{])?|[A-Z]+[^a-z_{])	{ if(yytext[yyleng-1]=='\n') { current_lineno++; BEGIN(T0); } yylval.str=strdup(fixup(yytext)); return T_TEMPLITTOK; }
 
 {ws}+		;
 <*>\n		{ current_lineno++; BEGIN(INITIAL); }

@@ -829,14 +829,15 @@ void crunchtemplate(VT tl, char *name)
     LISTITER(t->xtemplate.tokens, i2, tok) { 
       if(tok->type==XCLASS) {
 	char *clsname=tok->xclass.str->xstring.str;
-	int clsl=strlen(clsname);
+	int clsl=strlen(clsname), anon=0;
 	VT cl;
-	if(mapget(vars, mktmpstr(clsname+clsl-1, 1))!=NIL) {
+	anon = (clsname[clsl-1]=='_');
+	if(!anon && mapget(vars, mktmpstr(clsname+clsl-1, 1))!=NIL) {
 	  fprintf(stderr, "nonlinear pattern variable %s in %s\n",
 		  clsname+clsl-1, name);
 	  exit(1);
 	}
-	ts=mkstring(poolstring(&textpool, clsname+clsl-1));
+	if(!anon) ts=mkstring(poolstring(&textpool, clsname+clsl-1));
 	clsname=poolstring(&textpool, clsname);
 	clsname[clsl-1]='\0';
 	i2->xpair.left=tok=mkclass(mkstring(clsname));
@@ -844,7 +845,7 @@ void crunchtemplate(VT tl, char *name)
 	  fprintf(stderr, "undefined class %s used in %s\n", clsname, name);
 	  exit(1);
 	}
-	mapset(vars, ts, mkpair(cl, mknumber(pos)));
+	if(!anon) mapset(vars, ts, mkpair(cl, mknumber(pos)));
       } else if(tok->type==XNUMBER) {
 	VT cl, cl2;
 	if(mapget(vars, tok)) {
