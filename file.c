@@ -230,4 +230,5 @@ void file_end()
   if(filestack!=NULL) free(filestack);
   if(allfiles!=NULL) free(allfiles);
   if(incdir!=NULL) free(incdir);
+  yylex_destroy();
 }
