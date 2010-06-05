@@ -17,7 +17,6 @@ extern void backend_init();
 extern void backend_end();
 extern void backend_finalize();
 extern void begen(SMV v, int b);
-extern void bexgen(int t, int l, SMV v1, int b1, SMV v2, int b2);
 extern void bexgen1(int n, SMV v);
 extern void bexgen2(int n, SMV v1, SMV v2);
 extern void bexgen3(int n, SMV v1, SMV v2, SMV v3);

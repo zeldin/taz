@@ -520,12 +520,6 @@ void smach_emit(SMV v, int b)
   }
 }
 
-void smach_xemit(int t, int l, SMV v1, int b1, SMV v2, int b2)
-{
-  fprintf(stderr, "Internal error: smach:xemit(%d)\n", t);
-  exit(3);
-}
-
 void smach_xemit1(int n, SMV v)
 {
   emit(v);
