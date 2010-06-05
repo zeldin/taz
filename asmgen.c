@@ -26,7 +26,6 @@ VT *nslots = NULL;
 #endif
 
 int maxrecurse = 20;
-int magslot = 0;
 
 struct stdtoken { char *str, *token; } stdtok[] = {
   { "<<", "T_SHL" },
@@ -66,6 +65,11 @@ struct stdtoken { char *str, *token; } stdtok[] = {
 #define M_ENUMPROD 512
 #define M_TEMPLATEPROD 1024
 #define M_CLASSTYPES 2048
+#define M_EMITX 4096
+#define M_X1 16384
+#define M_X2 32768
+#define M_X3 65536
+#define M_X4 131072
 
 #define FLAG_OPCODE (M_OPCODERE|M_OPCODETOK)
 
@@ -134,13 +138,10 @@ void print_slot(FILE *f, int s)
 void print_shifted(FILE *f, VT bs, int b)
 {
   if(!b) {
-    if(bs->xbitslice.slot == magslot)
-      fprintf(f, "KEYVAL");
-    else
 #ifdef INLINE_CLASSES
-      print_slot(f, bs->xbitslice.slot);
+    print_slot(f, bs->xbitslice.slot);
 #else
-      fprintf(f, "$%d", bs->xbitslice.slot);
+    fprintf(f, "$%d", bs->xbitslice.slot);
 #endif
   } else if(b<=16) {
     fprintf(f, "MKLS1(");
@@ -212,31 +213,133 @@ int print_slicedexp(FILE *f, VT bss)
   return totbits;
 }
 
-VT find_inferior_class(VT t1, VT t2)
+int print_slicedn(FILE *f, VT bss, int *parammap)
 {
-  VT i1, i2;
-  int n=0;
+  VT i, bs;
+  intmax_t s=0;
+  int totbits=0, ne=0, no=0, cc=0, nn;
 
-  for(i1=t1->xtemplate.tokens->xlist.head,
-	i2=t2->xtemplate.tokens->xlist.head;
-      i1!=NIL && i2!=NIL;
-      i1=i1->xpair.right, i2=i2->xpair.right) {
-    VT tok1=i1->xpair.left, tok2=i2->xpair.left;
-    ++n;
-    if(tok1->type == XCLASS) {
-      if(strcmp(tok1->xclass.str->xstring.str, tok2->xclass.str->xstring.str)) {
-	VT cls1=mapget(classes,tok1->xclass.str);
-	VT cls2=mapget(classes,tok2->xclass.str);
-	if(cls1->xnumeric.bits != cls2->xnumeric.bits) {
-	  magslot = n;
-	  return cls2;
-	}
+  LISTITER(bss, i, bs) {
+    xassert(bs, XBITSLICE);
+    if(bs->xbitslice.offs<0) xwrong();
+    if(bs->xbitslice.bits<0) xwrong();
+    totbits+=bs->xbitslice.bits;
+    if(bs->xbitslice.classname==NIL)
+      s|=((intmax_t)bs->xbitslice.value)<<bs->xbitslice.offs;
+    else if(bs->xbitslice.classname->type==XENUM)
+      ne++;
+    else
+      no++;
+  }
+  if(s || ne) no++;
+  for(nn=1; nn<no; nn++)
+    fprintf(f, "(");
+  if(s || ne) {
+    fprintf(f, "(");
+    if(s) { fprintf(f, "%jdlu", s); cc++; }
+    LISTITER(bss, i, bs) {
+      if(bs->xbitslice.classname!=NIL &&
+	 bs->xbitslice.classname->type==XENUM) {
+	if(cc++) fprintf(f, "|");
+	fprintf(f, "(PARAM%d", parammap[bs->xbitslice.slot]);
+	if(!enum_checkbits(bs->xbitslice.classname, bs->xbitslice.bits))
+	  fprintf(f, "&%ldl", (1l<<bs->xbitslice.bits)-1);
+	if(bs->xbitslice.offs)
+	  fprintf(f, ")<<%d", bs->xbitslice.offs);
+	else
+	  fprintf(f, ")");
       }
     }
+    fprintf(f, ")");
   }
+  if(no) {
+    cc=0;
+    if(s || ne) cc++;
+    LISTITER(bss, i, bs) {
+      if(bs->xbitslice.classname!=NIL &&
+	 bs->xbitslice.classname->type!=XENUM) {
+	VT cls = bs->xbitslice.classname;
+	if(cc) fprintf(f, "|");
+	if(cls->xnumeric.relative != -1)
+	  fprintf(f, "(((PARAM%d-(*current_loc+%d))&%ldl)",
+		  parammap[bs->xbitslice.slot], cls->xnumeric.relative,
+		  (1l<<bs->xbitslice.bits)-1);
+	else
+	  fprintf(f, "((PARAM%d&%ldl)", parammap[bs->xbitslice.slot],
+		  (1l<<bs->xbitslice.bits)-1);
+	if(bs->xbitslice.offs)
+	  fprintf(f, "<<%d", bs->xbitslice.offs);
+	fprintf(f, ")");
+	if(cc) fprintf(f, ")");
+	cc++;
+      }
+    }   
+  } else fprintf(f, "0");
+  return totbits;
+}
 
-  fprintf(stderr, "Internal error\n");
-  exit(2);
+void print_slicechecknum(FILE *f, VT bss, int *parammap, char mode)
+{
+  VT i, bs;
+  int cc=0;
+
+  LISTITER(bss, i, bs) {
+    xassert(bs, XBITSLICE);
+    if(bs->xbitslice.offs<0) xwrong();
+    if(bs->xbitslice.bits<0) xwrong();
+    if(bs->xbitslice.classname==NIL)
+      ;
+    else if(bs->xbitslice.classname->type==XNUMERIC) {
+      VT cls = bs->xbitslice.classname;
+      if(cc && mode == 'S')
+	fprintf(f, "&&");
+      if(cls->xnumeric.relative != -1)
+	fprintf(f, "checknum%c%c(PARAM%d-(*current_loc+%d),%d)",
+		cls->xnumeric.signedness, mode, parammap[bs->xbitslice.slot],
+		cls->xnumeric.relative, cls->xnumeric.bits);	  
+      else
+	fprintf(f, "checknum%c%c(PARAM%d,%d)",
+		cls->xnumeric.signedness, mode, parammap[bs->xbitslice.slot],
+		cls->xnumeric.bits);
+      if(mode != 'S')
+	fprintf(f, ";");
+      cc++;
+    }
+  }
+}
+
+void print_deferredgen(FILE *f, VT bss, int *n)
+{
+  VT i, bs;
+  int totbits=0, nn=0, cc=0;
+
+  LISTITER(bss, i, bs) {
+    xassert(bs, XBITSLICE);
+    if(bs->xbitslice.offs<0) xwrong();
+    if(bs->xbitslice.bits<0) xwrong();
+    totbits+=bs->xbitslice.bits;
+    if(bs->xbitslice.classname==NIL)
+      ;
+    else
+      nn++;
+  }
+  if(nn>4) {
+    fprintf(stderr, "More than 4 operands in magnitude sensitive op!\n");
+    exit(1);
+  }
+  fprintf(f, "XGEN%d(%d, ", nn, n[nn]++);
+  LISTITER(bss, i, bs) {
+    if(bs->xbitslice.classname!=NIL) {
+      if(cc) fprintf(f, ",");
+      if (bs->xbitslice.classname->type==XENUM) {
+	fprintf(f, "MKICON($%d)", bs->xbitslice.slot);
+      } else {
+	fprintf(f, "$%d", bs->xbitslice.slot);
+      }
+      cc++;
+    }
+  }
+  fprintf(f, ");");
 }
 
 int mergable(VT t1, VT t2)
@@ -271,12 +374,16 @@ int mergable(VT t1, VT t2)
 	  return 0;
 	if(cls1->xnumeric.bits == cls2->xnumeric.bits)
 	  break;
-	if(mergemode)
-	  return 0;
-	if(cls1->xnumeric.bits < cls2->xnumeric.bits)
-	  mergemode = -1;
-	else
-	  mergemode = 1;
+	if(mergemode) {
+	  if((mergemode > 0 && cls1->xnumeric.bits < cls2->xnumeric.bits) ||
+	     (mergemode < 0 && !(cls1->xnumeric.bits < cls2->xnumeric.bits)))
+	    return 0;
+	} else {
+	  if(cls1->xnumeric.bits < cls2->xnumeric.bits)
+	    mergemode = -1;
+	  else
+	    mergemode = 1;
+	}
       }
       break;
     default:
@@ -293,8 +400,9 @@ int mergable(VT t1, VT t2)
 void gen_productions(FILE *f, int mask, VT tl, char *name)
 {
   VT i, i2, t, tok, bss;
-  int n=0;
+  int n=0, defcnt[5];
 
+  memset(defcnt, 0, sizeof(defcnt));
   fprintf(f, "\n%s\n", (name==NULL? "opcode":name));
   LISTITER(tl, i, t) {
     int nt=0;
@@ -330,22 +438,11 @@ void gen_productions(FILE *f, int mask, VT tl, char *name)
     }
     if(name==NULL) {
       if(t->xtemplate.next != NIL) {
-	VT mcls=find_inferior_class(t,t->xtemplate.next);
-#ifdef INLINE_CLASSES
-	fprintf(f, "XGEN(");
-	print_slot(f, magslot);
-	fprintf(f, ",M_CHECK%c,%d,",mcls->xnumeric.signedness,mcls->xnumeric.bits);
-#else
-	fprintf(f, "XGEN($%d,M_CHECK%c,%d,",magslot,
-		mcls->xnumeric.signedness,mcls->xnumeric.bits);
-#endif
-	fprintf(f, ",%d,", print_slicedexp(f, t->xtemplate.next->xtemplate.primary));
-	fprintf(f, ",%d);", print_slicedexp(f, t->xtemplate.primary));
+	print_deferredgen(f, t->xtemplate.primary, defcnt);
       } else if(t->xtemplate.primary->xlist.num>0) {
 	fprintf(f, "GEN(");
 	fprintf(f, ",%d);", print_slicedexp(f, t->xtemplate.primary));
       }
-      magslot=0;
     } else {
       if(t->xtemplate.next != NIL) {
 	fprintf(stderr, "Magnitude sensitive operands in template classes not supported.\n");
@@ -360,6 +457,56 @@ void gen_productions(FILE *f, int mask, VT tl, char *name)
     free(nslots);
     nslots = NULL;
 #endif
+  }
+}
+
+void gen_xops(FILE *f, int mask, VT tl)
+{
+  VT i, i2, t, t2, tok;
+  int defcnt=0;
+  int *parammap;
+
+  LISTITER(tl, i, t) {
+    int nt=0, nn=0;
+    xassert(t, XTEMPLATE);
+    if(t->xtemplate.parent != NIL)
+      continue;
+    if(t->xtemplate.next == NIL)
+      continue;
+    parammap = calloc(t->xtemplate.tokens->xlist.num+1, sizeof(int));
+    LISTITER(t->xtemplate.tokens, i2, tok) {
+      ++nt;
+      if(tok->type==XCLASS) {
+	VT cls1=mapget(classes,tok->xclass.str);
+	if(cls1->type == XNUMERIC ||
+	   cls1->type == XENUM) {
+	  parammap[nt] = ++nn;
+	}
+      }
+    }
+    switch (nn) {
+    case 1: if(mask & M_X1) break; else continue;
+    case 2: if(mask & M_X2) break; else continue;
+    case 3: if(mask & M_X3) break; else continue;
+    case 4: if(mask & M_X4) break; else continue;
+    default: xwrong(); continue;
+    }
+    fprintf(f, "  case %d:\n    ", defcnt);
+    for (t2 = t; t2->xtemplate.next != NIL; t2 = t2->xtemplate.next) {
+      fprintf(f, "if (");
+      print_slicechecknum(f, t2->xtemplate.primary, parammap, 'S');
+      fprintf(f, ")\n      ");
+      fprintf(f, "EMITNX(");
+      fprintf(f, ",%d);", print_slicedn(f, t2->xtemplate.primary, parammap));
+      fprintf(f, "\n    else\n    ");
+    }
+    fprintf(f, "{\n      ");
+    print_slicechecknum(f, t2->xtemplate.primary, parammap, 'W');
+    fprintf(f, "\n      EMITNX(");
+    fprintf(f, ",%d);", print_slicedn(f, t2->xtemplate.primary, parammap));
+    fprintf(f, "\n    }\n    break;\n");
+    defcnt++;
+    free(parammap);
   }
 }
 
@@ -450,6 +597,9 @@ void gen_output(FILE *f, int mask)
 
   if(mask&M_OPCODEPROD)
     gen_productions(f, mask, opcode_template, NULL);
+
+  if(mask&M_EMITX)
+    gen_xops(f, mask, opcode_template);
 }
 
 struct { char *name; int mask; } tag[] = {
@@ -464,7 +614,11 @@ struct { char *name; int mask; } tag[] = {
   { "numericproductions", M_NUMPROD },
   { "enumproductions", M_ENUMPROD },
   { "templateproductions", M_TEMPLATEPROD },
-  { "classtypes", M_CLASSTYPES }
+  { "classtypes", M_CLASSTYPES },
+  { "emitx1", M_EMITX|M_X1 },
+  { "emitx2", M_EMITX|M_X2 },
+  { "emitx3", M_EMITX|M_X3 },
+  { "emitx4", M_EMITX|M_X4 },
 };
 #define NUMTAGS (sizeof(tag)/sizeof(tag[0]))
 
@@ -895,12 +1049,12 @@ void crunchtemplate(VT tl, char *name)
 	    fprintf(stderr, "X-way merge not implemented\n");
 	    exit(1);
 	  }
-	  if(n<0) {
-	    /* t has the narrower type, make it the child */
+	  if(n>0) {
+	    /* t has the wider type, make it the child */
 	    t->xtemplate.parent = t2;
 	    t2->xtemplate.next = t;
 	  } else {
-	    /* t has the wider type, make it the parent */
+	    /* t has the narrower type, make it the parent */
 	    t->xtemplate.next = t2;
 	    t2->xtemplate.parent = t;
 	  }

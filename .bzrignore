@@ -8,5 +8,6 @@ gram.y
 y.output
 gram.h
 gram.c
+bex.c
 sieve
 as68k

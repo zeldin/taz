@@ -1,0 +1,96 @@
+#include <stdio.h>
+#include <string.h>
+
+#include "taz.h"
+#include "smach.h"
+#include "backend.h"
+
+#define PARAM1 v1
+#define PARAM2 v2
+#define PARAM3 v3
+#define PARAM4 v4
+
+static int checknumUS(numtype v, int bits)
+{
+  return !(v<0 || v>=(1<<bits));
+}
+
+static int checknumSS(numtype v, int bits)
+{
+  return !(v<-(1<<(bits-1)) || v>=(1<<(bits-1)));
+}
+
+static int checknumWS(numtype v, int bits)
+{
+  return !(v<1 || v>(1<<bits));
+}
+
+static int checknumXS(numtype v, int bits)
+{
+  return !(v<-(1<<bits) || v>=(1<<bits));
+}
+
+static void checknumUW(numtype v, int bits)
+{
+  if(!checknumUS(v, bits))
+    errormsg("value is out of range %d bits unsigned", bits);
+}
+
+static void checknumSW(numtype v, int bits)
+{
+  if(!checknumSS(v, bits))
+    errormsg("value is out of range %d bits signed", bits);
+}
+
+static void checknumWW(numtype v, int bits)
+{
+  if(!checknumWS(v, bits))
+    errormsg("value is out of range %d bits wraparound", bits);
+}
+
+static void checknumXW(numtype v, int bits)
+{
+  if(!checknumXS(v, bits))
+    errormsg("value is out of range %d bits", bits);
+}
+
+
+void be_emitx1(int n, numtype v1)
+{
+  switch (n) {
+<- emitx1 ->
+  default:
+    fprintf(stderr, "Internal error: bex:be_emitx1(%d)\n", n);
+    exit(3);
+  }
+}
+
+void be_emitx2(int n, numtype v1, numtype v2)
+{
+  switch (n) {
+<- emitx2 ->
+  default:
+    fprintf(stderr, "Internal error: bex:be_emitx2(%d)\n", n);
+    exit(3);
+  }
+}
+
+void be_emitx3(int n, numtype v1, numtype v2, numtype v3)
+{
+  switch (n) {
+<- emitx3 ->
+  default:
+    fprintf(stderr, "Internal error: bex:be_emitx3(%d)\n", n);
+    exit(3);
+  }
+}
+
+void be_emitx4(int n, numtype v1, numtype v2, numtype v3, numtype v4)
+{
+  switch (n) {
+<- emitx4 ->
+  default:
+    fprintf(stderr, "Internal error: bex:be_emitx4(%d)\n", n);
+    exit(3);
+  }
+}

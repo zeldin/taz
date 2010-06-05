@@ -35,9 +35,42 @@ void begen(SMV v, int b)
   smach_flush();
 }
 
-void bexgen(int t, int l, SMV v1, int b1, SMV v2, int b2)
+void bexgen1(int n, SMV v)
 {
-  smach_xemit(t, l, v1, b1, v2, b2);
+  smach_xemit1(n, v);
+
+  if(be_freehold <= allochold) {
+    be_freehold++;
+    begen(*--be_holdSMVs, *--be_holdbits);
+  } else
+    smach_flush();
+}
+
+void bexgen2(int n, SMV v1, SMV v2)
+{
+  smach_xemit2(n, v1, v2);
+
+  if(be_freehold <= allochold) {
+    be_freehold++;
+    begen(*--be_holdSMVs, *--be_holdbits);
+  } else
+    smach_flush();
+}
+
+void bexgen3(int n, SMV v1, SMV v2, SMV v3)
+{
+  smach_xemit3(n, v1, v2, v3);
+
+  if(be_freehold <= allochold) {
+    be_freehold++;
+    begen(*--be_holdSMVs, *--be_holdbits);
+  } else
+    smach_flush();
+}
+
+void bexgen4(int n, SMV v1, SMV v2, SMV v3, SMV v4)
+{
+  smach_xemit4(n, v1, v2, v3, v4);
 
   if(be_freehold <= allochold) {
     be_freehold++;
