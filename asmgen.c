@@ -374,12 +374,16 @@ int mergable(VT t1, VT t2)
 	  return 0;
 	if(cls1->xnumeric.bits == cls2->xnumeric.bits)
 	  break;
-	if(mergemode)
-	  return 0;
-	if(cls1->xnumeric.bits < cls2->xnumeric.bits)
-	  mergemode = -1;
-	else
-	  mergemode = 1;
+	if(mergemode) {
+	  if((mergemode > 0 && cls1->xnumeric.bits < cls2->xnumeric.bits) ||
+	     (mergemode < 0 && !(cls1->xnumeric.bits < cls2->xnumeric.bits)))
+	    return 0;
+	} else {
+	  if(cls1->xnumeric.bits < cls2->xnumeric.bits)
+	    mergemode = -1;
+	  else
+	    mergemode = 1;
+	}
       }
       break;
     default:
