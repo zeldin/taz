@@ -20,7 +20,7 @@ ASMGENFILE = m68k.tab
 HASHSIZE = 12000
 
 OBJS = main.o lexer.o gram.o file.o symbol.o storage.o macro.o smach.o \
-		backend.o dmalloc.o
+		backend.o bex.o dmalloc.o
 
 AGOBJS = asmgen.o aglexer.o aggram.o agstorage.o fileag.o storage.o dmalloc.o
 
@@ -63,6 +63,9 @@ lexer.l : asmgen lexer.l.in $(ASMGENFILE)
 gram.y : asmgen gram.y.in $(ASMGENFILE)
 	./asmgen -o gram.y $(ASMGENFILE)
 
+bex.c : asmgen bex.c.in $(ASMGENFILE)
+	./asmgen -o bex.c $(ASMGENFILE)
+
 lexer.c : lexer.l
 	$(LEX) -t $^ > $@
 
@@ -89,6 +92,8 @@ macro.o : macro.c taz.h
 smach.o : smach.c taz.h smach.h backend.h
 
 backend.o : backend.c taz.h smach.h backend.h
+
+bex.o : bex.c taz.h smach.h backend.h
 
 dmalloc.o : dmalloc.c
 

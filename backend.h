@@ -18,6 +18,10 @@ extern void backend_end();
 extern void backend_finalize();
 extern void begen(SMV v, int b);
 extern void bexgen(int t, int l, SMV v1, int b1, SMV v2, int b2);
+extern void bexgen1(int n, SMV v);
+extern void bexgen2(int n, SMV v1, SMV v2);
+extern void bexgen3(int n, SMV v1, SMV v2, SMV v3);
+extern void bexgen4(int n, SMV v1, SMV v2, SMV v3, SMV v4);
 extern void behold(SMV v, int b);
 extern void reset_sections();
 extern int write_section_data(struct section *s, FILE *f);
@@ -28,9 +32,22 @@ extern int *be_holdbits;
 extern SMV *be_holdSMVs;
 
 #define GEN(x,b) begen(x,b)
-#define XGEN(k,t,l,x1,b1,x2,b2) do{smach_setkeyval(k);bexgen(t,l,x1,b1,x2,b2);}while(0)
+#define XGEN1(n,x) do{bexgen1(n,x);}while(0)
+#define XGEN2(n,x1,x2) do{bexgen2(n,x1,x2);}while(0)
+#define XGEN3(n,x1,x2,x3) do{bexgen1(n,x1,x2,x3);}while(0)
+#define XGEN4(n,x1,x2,x3,x4) do{bexgen1(n,x1,x2,x3,x4);}while(0)
+
 #define HOLD(x,b) ((--be_freehold)?(((void)(*be_holdbits++=b)),((void)(*be_holdSMVs++=x))):behold(x,b))
-#define KEYVAL smach_getkeyval()
+
+extern void be_emitx1(int, numtype);
+extern void be_emitx2(int, numtype, numtype);
+extern void be_emitx3(int, numtype, numtype, numtype);
+extern void be_emitx4(int, numtype, numtype, numtype, numtype);
+
+#define EMITX1(n,v)           be_emitx1(n,v)
+#define EMITX2(n,v1,v2)       be_emitx2(n,v1,v2)
+#define EMITX3(n,v1,v2,v3)    be_emitx3(n,v1,v2,v3)
+#define EMITX4(n,v1,v2,v3,v4) be_emitx4(n,v1,v2,v3,v4)
 
 extern void be_emitn(int, numtype);
 extern void be_emiti(int, unsigned char *);
@@ -39,6 +56,7 @@ extern void be_setloc(numtype);
 
 #define EMITN(bi,n) be_emitn(bi, n)
 #define EMITI(by,p) be_emiti(by, p)
+#define EMITNX(n,bi) EMITN(bi, n)
 
 #ifdef SUBBYTE_EMIT
 

@@ -40,12 +40,12 @@ static struct symbol *changed;
 #define OP_BREAK (0xc2)
 #define OP_ARITH(n) (0xc3+(n)-M_ADD)
 #define OP_EXTENDED (0xc7)
-#define OP_SETKEYVAL (0xc8)
-#define OP_GETKEYVAL (0xc9)
-#define OP_TESTU (0xca)
-#define OP_TESTS (0xcb)
-#define OP_TESTW (0xcc)
-#define OP_TESTX (0xcd)
+/*#define OP_SETKEYVAL (0xc8)*/
+/*#define OP_GETKEYVAL (0xc9)*/
+#define OP_XOP1 (0xca)
+#define OP_XOP2 (0xcb)
+#define OP_XOP3 (0xcc)
+#define OP_XOP4 (0xcd)
 #define OP_LS1(n) (0xd0|((n)-1))
 #define OP_LS2(n) (0xe0|(((n)>>4)-1))
 /* #define OP_STPREFIX(n) (0xe8|(n)) */
@@ -83,8 +83,7 @@ static int regd_blks, allocated_blks;
 #define POP (STKVAL0(--stkp))
 
 static int stkp=0, saved_lineno;
-static numtype valstack[100], keyval;
-static SMV keyval_smv;
+static numtype valstack[100];
 
 static SMV allocSMV()
 {
@@ -359,8 +358,6 @@ void smach_dump(FILE *f, SMV v)
   case M_CHECKX:
     fprintf(f, "X%d(", SMVelt(v, ls).n); smach_dump(f, SMVelt(v, ls).v);
     fprintf(f, ")"); break;
-  case M_KEYVAL:
-    fprintf(f, "[]"); break;
   default:
     fprintf(f, "?%d?", SMVelt(v,type));
   }
@@ -464,9 +461,6 @@ static void emit(SMV v)
     emit_prefix(SMVelt(v,ls).n);
     EMIT(OP_CHECKX);
     break;
-  case M_KEYVAL:
-    EMIT(OP_GETKEYVAL);
-    break;
   default:
     fprintf(stderr, "Internal error: smach:emit(%d)\n", SMVelt(v,type));
     exit(3);
@@ -528,61 +522,42 @@ void smach_emit(SMV v, int b)
 
 void smach_xemit(int t, int l, SMV v1, int b1, SMV v2, int b2)
 {
-  SMV k = keyval_smv;
-  if(current_lineno > saved_lineno) {
-    emit_prefix(current_lineno-saved_lineno-1);
-    EMIT(OP_LINENO);
-    saved_lineno = current_lineno;
-  }
-  if(SMVelt(k,type)==M_ICON) {
-    int large=0;
-    switch(t) {
-     case M_CHECKU:
-       if(SMVelt(k,number.num)<0 || SMVelt(k,number.num)>=(1<<l))
-	 large=1;
-       break;
-     case M_CHECKS:
-       if(SMVelt(k,number.num)<-(1<<(l-1)) ||
-	  SMVelt(k,number.num)>=(1<<(l-1)))
-	 large=1;
-       break;
-     case M_CHECKW:
-       if(SMVelt(k,number.num)<1 || SMVelt(k,number.num)>(1<<l))
-	 large=1;
-       break;
-     case M_CHECKX:
-       if(SMVelt(k,number.num)<-(1<<l) || SMVelt(k,number.num)>=(1<<l))
-	 large=1;
-       break;
-    }
-    if(large)
-      smach_emit(v2, b2);
-    else
-      smach_emit(v1, b1);
-  } else {
-    emit(v1);
-    EMIT(OP_PUSH(b1));
-    emit(v2);
-    EMIT(OP_PUSH(b2));
-    emit_prefix(l);
-    switch(t) {
-    case M_CHECKU:
-      EMIT(OP_TESTU);
-      break;
-    case M_CHECKS:
-      EMIT(OP_TESTS);
-      break;
-    case M_CHECKW:
-      EMIT(OP_TESTW);
-      break;
-    case M_CHECKX:
-      EMIT(OP_TESTX);
-      break;
-    default:
-      fprintf(stderr, "Internal error: smach:xemit(%d)\n", t);
-      exit(3);
-    }
-  }
+  fprintf(stderr, "Internal error: smach:xemit(%d)\n", t);
+  exit(3);
+}
+
+void smach_xemit1(int n, SMV v)
+{
+  emit(v);
+  emit_prefix(n);
+  EMIT(OP_XOP1);
+}
+
+void smach_xemit2(int n, SMV v1, SMV v2)
+{
+  emit(v1);
+  emit(v2);
+  emit_prefix(n);
+  EMIT(OP_XOP2);
+}
+
+void smach_xemit3(int n, SMV v1, SMV v2, SMV v3)
+{
+  emit(v1);
+  emit(v2);
+  emit(v3);
+  emit_prefix(n);
+  EMIT(OP_XOP3);
+}
+
+void smach_xemit4(int n, SMV v1, SMV v2, SMV v3, SMV v4)
+{
+  emit(v1);
+  emit(v2);
+  emit(v3);
+  emit(v4);
+  emit_prefix(n);
+  EMIT(OP_XOP4);
 }
 
 void smach_setsym(struct symbol *s, SMV v)
@@ -718,37 +693,24 @@ fprintf(stderr, "\n");
 	STKVAL(0) &= (1<<pfx)-1;
 	pfx = 0;
 	break;
-      case OP_TESTU:
-	if(keyval<0 || keyval>=(1<<pfx)) {
-	  EMITN(STKVAL(0),STKVAL(1));
-	} else {
-	  EMITN(STKVAL(2),STKVAL(3));
-	}
-	stkp -= 4;
+      case OP_XOP1:
+	EMITX1(pfx, STKVAL(0));
+	stkp-=1;
 	pfx = 0;
 	break;
-      case OP_TESTS:
-	if(keyval<-(1<<(pfx-1)) || keyval>=(1<<(pfx-1)))
-	  EMITN(STKVAL(0),STKVAL(1));
-	else
-	  EMITN(STKVAL(2),STKVAL(3));
-	stkp -= 4;
+      case OP_XOP2:
+	EMITX2(pfx, STKVAL(0), STKVAL(1));
+	stkp-=2;
 	pfx = 0;
 	break;
-      case OP_TESTW:
-	if(keyval<1 || keyval>(1<<pfx))
-	  EMITN(STKVAL(0),STKVAL(1));
-	else
-	  EMITN(STKVAL(2),STKVAL(3));
-	stkp -= 4;
+      case OP_XOP3:
+	EMITX3(pfx, STKVAL(0), STKVAL(1), STKVAL(2));
+	stkp-=3;
 	pfx = 0;
 	break;
-      case OP_TESTX:
-	if(keyval<-(1<<pfx) || keyval>=(1<<pfx))
-	  EMITN(STKVAL(0),STKVAL(1));
-	else
-	  EMITN(STKVAL(2),STKVAL(3));
-	stkp -= 4;
+      case OP_XOP4:
+	EMITX4(pfx, STKVAL(0), STKVAL(1), STKVAL(2), STKVAL(3));
+	stkp-=4;
 	pfx = 0;
 	break;
 	/*
@@ -804,9 +766,6 @@ fprintf(stderr, "\n");
 	  break;
 	}
 
-      case OP_SETKEYVAL: keyval = POP; break;
-      case OP_GETKEYVAL: PUSH(keyval); break;
-
       default:
 	fprintf(stderr, "Internal error: smach:smach_execute(%02x)\n", o);
 	exit(3);
@@ -857,22 +816,5 @@ void smach_end()
     free(code_blk);
   }
   if(SMVs) free(SMVs);
-}
-
-void smach_setkeyval(SMV k)
-{
-  if(SMVelt(k,type)==M_ICON) {
-    keyval_smv = k;
-  } else {
-    emit(k);
-    EMIT(OP_SETKEYVAL);
-    keyval_smv=allocSMV();
-    SMVelt(keyval_smv,type)=M_KEYVAL;
-  }
-}
-
-SMV smach_getkeyval()
-{
-  return keyval_smv;
 }
 
