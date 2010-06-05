@@ -522,6 +522,11 @@ void smach_emit(SMV v, int b)
 
 void smach_xemit1(int n, SMV v)
 {
+  if(current_lineno > saved_lineno) {
+    emit_prefix(current_lineno-saved_lineno-1);
+    EMIT(OP_LINENO);
+    saved_lineno = current_lineno;
+  }
   emit(v);
   emit_prefix(n);
   EMIT(OP_XOP1);
@@ -529,6 +534,11 @@ void smach_xemit1(int n, SMV v)
 
 void smach_xemit2(int n, SMV v1, SMV v2)
 {
+  if(current_lineno > saved_lineno) {
+    emit_prefix(current_lineno-saved_lineno-1);
+    EMIT(OP_LINENO);
+    saved_lineno = current_lineno;
+  }
   emit(v1);
   emit(v2);
   emit_prefix(n);
@@ -537,6 +547,11 @@ void smach_xemit2(int n, SMV v1, SMV v2)
 
 void smach_xemit3(int n, SMV v1, SMV v2, SMV v3)
 {
+  if(current_lineno > saved_lineno) {
+    emit_prefix(current_lineno-saved_lineno-1);
+    EMIT(OP_LINENO);
+    saved_lineno = current_lineno;
+  }
   emit(v1);
   emit(v2);
   emit(v3);
@@ -546,6 +561,11 @@ void smach_xemit3(int n, SMV v1, SMV v2, SMV v3)
 
 void smach_xemit4(int n, SMV v1, SMV v2, SMV v3, SMV v4)
 {
+  if(current_lineno > saved_lineno) {
+    emit_prefix(current_lineno-saved_lineno-1);
+    EMIT(OP_LINENO);
+    saved_lineno = current_lineno;
+  }
   emit(v1);
   emit(v2);
   emit(v3);
