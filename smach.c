@@ -28,6 +28,11 @@ union smval {
     SMV v;
     int n;
   } ls;
+  struct {
+    int type;
+    SMV v;
+    int n;
+  } xform;
 };
 
 static struct symbol *changed;
@@ -40,7 +45,7 @@ static struct symbol *changed;
 #define OP_BREAK (0xc2)
 #define OP_ARITH(n) (0xc3+(n)-M_ADD)
 #define OP_EXTENDED (0xc7)
-/*#define OP_SETKEYVAL (0xc8)*/
+#define OP_XFORM (0xc8)
 /*#define OP_GETKEYVAL (0xc9)*/
 #define OP_XOP1 (0xca)
 #define OP_XOP2 (0xcb)
@@ -183,6 +188,23 @@ SMV mkunary(int t, SMV v)
     SMV s=allocSMV();
     SMVelt(s,type)=t;
     SMVelt(s,unary.v)=v;
+    return s;
+  }
+}
+
+SMV mkxform(int x, SMV v)
+{
+  if(SMVelt(v,type)==M_ICON) {
+    numtype n=SMVelt(v,number.num);
+    n = XFORMX(x, n);
+    SMVelt(v,number.num)=n;
+    return v;
+  } else
+  {
+    SMV s=allocSMV();
+    SMVelt(s,type)=M_XFORM;
+    SMVelt(s,xform.v)=v;
+    SMVelt(s,xform.n)=x;
     return s;
   }
 }
@@ -346,6 +368,9 @@ void smach_dump(FILE *f, SMV v)
   case M_LS1:
   case M_LS2:
     smach_dump(f, SMVelt(v, ls).v); fprintf(f, "<<%d", SMVelt(v, ls).n); break;
+  case M_XFORM:
+    fprintf(f, "XFORM%d(", SMVelt(v, xform).n);
+    smach_dump(f, SMVelt(v, xform).v); fprintf(f, ")"); break;
   case M_CHECKU:
     fprintf(f, "U%d(", SMVelt(v, ls).n); smach_dump(f, SMVelt(v, ls).v);
     fprintf(f, ")"); break;
@@ -440,6 +465,11 @@ static void emit(SMV v)
   case M_LS2:
     emit(SMVelt(v,ls).v);
     EMIT(OP_LS2(SMVelt(v,ls).n));
+    break;
+  case M_XFORM:
+    emit(SMVelt(v,xform).v);
+    emit_prefix(SMVelt(v,xform).n);
+    EMIT(OP_XFORM);
     break;
   case M_CHECKU:
     emit(SMVelt(v,ls).v);
@@ -683,6 +713,9 @@ fprintf(stderr, "\n");
       case OP_LS2(96): STKVAL(0)<<=96; break;
       case OP_LS2(112): STKVAL(0)<<=112; break;
       case OP_LS2(128): STKVAL(0)<<=128; break;
+      case OP_XFORM:
+	STKVAL(0)=XFORMX(pfx, STKVAL(0));
+	break;
       case OP_CHECKU:
 	if(STKVAL(0)<0 || STKVAL(0)>=(1<<pfx))
 	  errormsg("value is out of range %d bits unsigned", (int)pfx);
@@ -713,17 +746,17 @@ fprintf(stderr, "\n");
 	pfx = 0;
 	break;
       case OP_XOP2:
-	EMITX2(pfx, STKVAL(0), STKVAL(1));
+	EMITX2(pfx, STKVAL(1), STKVAL(0));
 	stkp-=2;
 	pfx = 0;
 	break;
       case OP_XOP3:
-	EMITX3(pfx, STKVAL(0), STKVAL(1), STKVAL(2));
+	EMITX3(pfx, STKVAL(2), STKVAL(1), STKVAL(0));
 	stkp-=3;
 	pfx = 0;
 	break;
       case OP_XOP4:
-	EMITX4(pfx, STKVAL(0), STKVAL(1), STKVAL(2), STKVAL(3));
+	EMITX4(pfx, STKVAL(3), STKVAL(2), STKVAL(1), STKVAL(0));
 	stkp-=4;
 	pfx = 0;
 	break;

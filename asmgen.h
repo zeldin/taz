@@ -41,7 +41,7 @@ struct xenum {
 struct xnumeric {
   int type;
   char signedness;
-  int bits, padbits, relative;
+  int bits, padbits, relative, xform;
 };
 #define XNUMERIC 6
 
@@ -92,7 +92,7 @@ extern VT mkpair(VT, VT);
 extern VT mkmapping();
 extern VT mklist();
 extern VT mkenum();
-extern VT mknumeric(char, int, int, int);
+extern VT mknumeric(char, int, int, int, int);
 extern VT mkbitslice(int, long, VT);
 extern VT mktemplate(VT, VT, VT);
 extern VT mkclass(VT);
@@ -103,6 +103,7 @@ extern VT mapget(VT, VT);
 extern void ags_init();
 extern int varlookup(const char *name);
 extern void varset(int var, const char *value);
+extern int registerxform(const char *name);
 
 extern VT classes, opcode_template;
 extern struct mempool textpool;

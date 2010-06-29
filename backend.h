@@ -48,6 +48,10 @@ extern void be_emitx4(int, numtype, numtype, numtype, numtype);
 #define EMITX3(n,v1,v2,v3)    be_emitx3(n,v1,v2,v3)
 #define EMITX4(n,v1,v2,v3,v4) be_emitx4(n,v1,v2,v3,v4)
 
+extern numtype be_xform(int, numtype);
+
+#define XFORMX(n,v) be_xform(n,v)
+
 extern void be_emitn(int, numtype);
 extern void be_emiti(int, unsigned char *);
 extern void be_extend(int);

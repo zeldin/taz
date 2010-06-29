@@ -20,7 +20,7 @@
 
 #define INLINE_CLASSES
 
-VT std_tokens, auto_tokens, opcode_tokens;
+VT std_tokens, auto_tokens, opcode_tokens, xforms;
 #ifdef INLINE_CLASSES
 VT *nslots = NULL;
 #endif
@@ -72,6 +72,7 @@ struct stdtoken { char *str, *token; } stdtok[] = {
 #define M_X4 131072
 #define M_BISON_OPTIONS 262144
 #define M_NOKEY 524288
+#define M_XFORMS 1048576
 
 #define FLAG_OPCODE (M_OPCODERE|M_OPCODETOK)
 
@@ -97,6 +98,18 @@ void printre(FILE *f, char *re)
       putc('\\', f);
       putc(*re++, f);
     }
+}
+
+char *printxform(VT cls, int mode)
+{
+  static char buf[64];
+  if(cls->xnumeric.xform < 0)
+    return "(";
+  if(mode)
+    sprintf(buf, "XFORM%d(", cls->xnumeric.xform);
+  else
+    sprintf(buf, "MKXFORM(%d,", cls->xnumeric.xform);
+  return buf;
 }
 
 int enum_checkbits(VT e, int b)
@@ -129,12 +142,12 @@ void print_slot(FILE *f, int s)
   }
 
   if(cls->xnumeric.relative != -1)
-    fprintf(f, "checknum%c(MKSUB($%d,MKADD(mksymbref(currloc_sym),MKICON(%d))),%d)",
-	    cls->xnumeric.signedness, s, cls->xnumeric.relative,
-	    cls->xnumeric.bits);	  
+    fprintf(f, "checknum%c(%sMKSUB($%d,MKADD(mksymbref(currloc_sym),MKICON(%d)))),%d)",
+	    cls->xnumeric.signedness, printxform(cls, 0), s,
+	    cls->xnumeric.relative, cls->xnumeric.bits);	  
   else
-    fprintf(f, "checknum%c($%d,%d)",
-	    cls->xnumeric.signedness, s, cls->xnumeric.bits);
+    fprintf(f, "checknum%c(%s$%d),%d)",
+	    cls->xnumeric.signedness, printxform(cls, 0), s, cls->xnumeric.bits);
 }
 #endif
 
@@ -264,12 +277,12 @@ int print_slicedn(FILE *f, VT bss, int *parammap)
 	VT cls = bs->xbitslice.classname;
 	if(cc) fprintf(f, "|");
 	if(cls->xnumeric.relative != -1)
-	  fprintf(f, "(((PARAM%d-(*current_loc+%d))&%ldl)",
-		  parammap[bs->xbitslice.slot], cls->xnumeric.relative,
-		  (1l<<bs->xbitslice.bits)-1);
+	  fprintf(f, "(((%sPARAM%d-(*current_loc+%d)))&%ldl)",
+		  printxform(cls, 'S'), parammap[bs->xbitslice.slot],
+		  cls->xnumeric.relative, (1l<<bs->xbitslice.bits)-1);
 	else
-	  fprintf(f, "((PARAM%d&%ldl)", parammap[bs->xbitslice.slot],
-		  (1l<<bs->xbitslice.bits)-1);
+	  fprintf(f, "((%sPARAM%d)&%ldl)", printxform(cls, 'S'),
+		  parammap[bs->xbitslice.slot], (1l<<bs->xbitslice.bits)-1);
 	if(bs->xbitslice.offs)
 	  fprintf(f, "<<%d", bs->xbitslice.offs);
 	fprintf(f, ")");
@@ -297,13 +310,14 @@ void print_slicechecknum(FILE *f, VT bss, int *parammap, char mode)
       if(cc && mode == 'S')
 	fprintf(f, "&&");
       if(cls->xnumeric.relative != -1)
-	fprintf(f, "checknum%c%c(PARAM%d-(*current_loc+%d),%d)",
-		cls->xnumeric.signedness, mode, parammap[bs->xbitslice.slot],
+	fprintf(f, "checknum%c%c(%sPARAM%d-(*current_loc+%d)),%d)",
+		cls->xnumeric.signedness, mode, printxform(cls, mode),
+		parammap[bs->xbitslice.slot],
 		cls->xnumeric.relative, cls->xnumeric.bits);	  
       else
-	fprintf(f, "checknum%c%c(PARAM%d,%d)",
-		cls->xnumeric.signedness, mode, parammap[bs->xbitslice.slot],
-		cls->xnumeric.bits);
+	fprintf(f, "checknum%c%c(%sPARAM%d),%d)",
+		cls->xnumeric.signedness, mode, printxform(cls, mode),
+		parammap[bs->xbitslice.slot], cls->xnumeric.bits);
       if(mode != 'S')
 	fprintf(f, ";");
       cc++;
@@ -347,7 +361,7 @@ void print_deferredgen(FILE *f, VT bss, int *n)
 
 int mergable(VT t1, VT t2)
 {
-  int mergemode = 0;
+  int mm, mergemode = 0;
   VT i1, i2;
 
   /* Fixme... */
@@ -372,20 +386,22 @@ int mergable(VT t1, VT t2)
 	VT cls1=mapget(classes,tok1->xclass.str);
 	VT cls2=mapget(classes,tok2->xclass.str);
 	if(cls1->type != cls2->type || cls1->type != XNUMERIC ||
-	   cls1->xnumeric.signedness != cls2->xnumeric.signedness ||
-	   cls1->xnumeric.relative != cls2->xnumeric.relative)
+	   cls1->xnumeric.signedness != cls2->xnumeric.signedness
+	   /*|| cls1->xnumeric.relative != cls2->xnumeric.relative*/)
 	  return 0;
-	if(cls1->xnumeric.bits == cls2->xnumeric.bits)
-	  break;
+	if(cls1->xnumeric.bits == cls2->xnumeric.bits) {
+	  if(cls1->xnumeric.xform<0 || !cls2->xnumeric.xform<0 ||
+	     cls1->xnumeric.xform == cls2->xnumeric.xform )
+	    break;
+	  mm = (cls1->xnumeric.xform < cls2->xnumeric.xform? -1 : 1);
+	} else
+	  mm = (cls1->xnumeric.bits < cls2->xnumeric.bits? -1 : 1);
 	if(mergemode) {
-	  if((mergemode > 0 && cls1->xnumeric.bits < cls2->xnumeric.bits) ||
-	     (mergemode < 0 && !(cls1->xnumeric.bits < cls2->xnumeric.bits)))
+	  if((mergemode > 0 && mm < 0) ||
+	     (mergemode < 0 && mm > 0))
 	    return 0;
 	} else {
-	  if(cls1->xnumeric.bits < cls2->xnumeric.bits)
-	    mergemode = -1;
-	  else
-	    mergemode = 1;
+	  mergemode = mm;
 	}
       }
       break;
@@ -465,26 +481,24 @@ void gen_productions(FILE *f, int mask, VT tl, char *name)
 
 void gen_xops(FILE *f, int mask, VT tl)
 {
-  VT i, i2, t, t2, tok;
+  VT i, i2, t, t2, tok, j, bs;
   int defcnt=0;
   int *parammap;
 
   LISTITER(tl, i, t) {
-    int nt=0, nn=0;
+    int nn=0;
     xassert(t, XTEMPLATE);
     if(t->xtemplate.parent != NIL)
       continue;
     if(t->xtemplate.next == NIL)
       continue;
     parammap = calloc(t->xtemplate.tokens->xlist.num+1, sizeof(int));
-    LISTITER(t->xtemplate.tokens, i2, tok) {
-      ++nt;
-      if(tok->type==XCLASS) {
-	VT cls1=mapget(classes,tok->xclass.str);
-	if(cls1->type == XNUMERIC ||
-	   cls1->type == XENUM) {
-	  parammap[nt] = ++nn;
-	}
+    
+    LISTITER(t->xtemplate.primary, j, bs) {
+      if(bs->xbitslice.classname!=NIL &&
+	 (bs->xbitslice.classname->type == XNUMERIC ||
+	  bs->xbitslice.classname->type == XENUM)) {
+	parammap[bs->xbitslice.slot] = ++nn;
       }
     }
     switch (nn) {
@@ -511,6 +525,23 @@ void gen_xops(FILE *f, int mask, VT tl)
     defcnt++;
     free(parammap);
   }
+}
+
+void gen_xforms(FILE *f, int mask, VT xforms)
+{
+  VT iter, nam, id;
+
+  MAPITER(xforms, iter, nam, id) {
+    fprintf(f, "extern numtype xform_%s(numtype);\n", nam->xstring.str);
+    fprintf(f, "#define XFORM%d xform_%s\n", id->xnumber.num, nam->xstring.str);
+  }
+
+  fprintf(f, "\nnumtype be_xform(int n, numtype v)\n{\n  switch(n) {\n");
+  MAPITER(xforms, iter, nam, id) {
+    int i = id->xnumber.num;
+    fprintf(f, "    case %d: return XFORM%d(v);\n", i, i);
+  }
+  fprintf(f, "    default: fprintf(stderr, \"Internal error: bex:be_xform(%%d)\\n\", n); exit(3);\n  }\n}\n\n");
 }
 
 void gen_output(FILE *f, int mask)
@@ -560,12 +591,12 @@ void gen_output(FILE *f, int mask)
       if(mask&M_NUMPROD) {
 	fprintf(f, "\n%s : expr\n", buf);
 	if(cls->xnumeric.relative != -1)
-	  fprintf(f, "  { $$ = checknum%c(MKSUB($1, MKADD(mksymbref(currloc_sym), MKICON(%d))), %d); }\n",
-		  cls->xnumeric.signedness, cls->xnumeric.relative,
-		  cls->xnumeric.bits);	  
+	  fprintf(f, "  { $$ = checknum%c(%sMKSUB($1, MKADD(mksymbref(currloc_sym), MKICON(%d)))), %d); }\n",
+		  cls->xnumeric.signedness, printxform(cls, 0),
+		  cls->xnumeric.relative, cls->xnumeric.bits);	  
 	else
-	  fprintf(f, "  { $$ = checknum%c($1, %d); }\n",
-		  cls->xnumeric.signedness, cls->xnumeric.bits);
+	  fprintf(f, "  { $$ = checknum%c(%s$1), %d); }\n",
+		  cls->xnumeric.signedness, printxform(cls, 0), cls->xnumeric.bits);
       }
       if(mask&M_CLASSTYPES)
 	fprintf(f, "%%type <exp> %s\n", buf);      
@@ -607,6 +638,9 @@ void gen_output(FILE *f, int mask)
 
   if(mask&M_EMITX)
     gen_xops(f, mask, opcode_template);
+
+  if(mask&M_XFORMS)
+    gen_xforms(f, mask, xforms);
 }
 
 struct { char *name; int mask; } tag[] = {
@@ -627,6 +661,7 @@ struct { char *name; int mask; } tag[] = {
   { "emitx3", M_EMITX|M_X3 },
   { "emitx4", M_EMITX|M_X4 },
   { "bison-options", M_BISON_OPTIONS },
+  { "xforms", M_XFORMS },
 };
 #define NUMTAGS (sizeof(tag)/sizeof(tag[0]))
 
@@ -981,6 +1016,43 @@ VT getsliceclass(VT p, VT el, int n)
   return NIL;
 }
 
+static void xwaymerge(VT t, VT t2)
+{
+  int n;
+
+  while (t->xtemplate.parent!=NIL)
+    t = t->xtemplate.parent;
+
+  if ((n = mergable(t, t2)) > 0) {
+    /* t has the wider type, make it the child */
+    t->xtemplate.parent = t2;
+    t2->xtemplate.next = t;
+    return;
+  }
+
+  while (n < 0) {
+    if (!t->xtemplate.next) {
+      /* t2 is the most wide type, make it the leaf */
+      t->xtemplate.next = t2;
+      t2->xtemplate.parent = t;
+      return;
+    }
+    t = t->xtemplate.next;
+    n = mergable(t, t2);
+  }
+
+  if (!n) {
+    fprintf(stderr, "X-way merge failed\n");
+    exit(1);
+  }
+
+  /* insert t2 before t */
+  t2->xtemplate.parent = t->xtemplate.parent;
+  t2->xtemplate.next = t;
+  t->xtemplate.parent = t2;
+  t2->xtemplate.parent->xtemplate.next = t2;
+}
+
 void crunchtemplate(VT tl, char *name)
 {
   VT i1, t, i2, tok, bs, nam, v, ts;
@@ -1054,10 +1126,8 @@ void crunchtemplate(VT tl, char *name)
 	if(t2->xtemplate.parent==NIL && t2->xtemplate.next==NIL &&
 	   (n=mergable(t, t2))) {
 	  if(t->xtemplate.parent!=NIL || t->xtemplate.next!=NIL) {
-	    fprintf(stderr, "X-way merge not implemented\n");
-	    exit(1);
-	  }
-	  if(n>0) {
+	    xwaymerge(t, t2);
+	  } else if(n>0) {
 	    /* t has the wider type, make it the child */
 	    t->xtemplate.parent = t2;
 	    t2->xtemplate.next = t;
@@ -1092,6 +1162,18 @@ int varlookup(const char *name)
 void varset(int v, const char *value)
 {
   var[v].value = strdup(value);
+}
+
+int registerxform(const char *name)
+{
+  VT v;
+  static int xfn=0;
+  
+  if ((v = mapget(xforms, mktmpstr(name, -1))) == NIL) {
+    v = mknumber(xfn++);
+    mapset(xforms, mkstring(strdup(name)), v);
+  }
+  return v->xnumber.num;
 }
 
 int main(int argc, char *argv[])
@@ -1131,6 +1213,7 @@ int main(int argc, char *argv[])
   opcode_tokens=mkmapping();
   for(i=0; i<NUM_STDTOK; i++)
     mapset(std_tokens, mkstring(stdtok[i].str), mkstring(stdtok[i].token));
+  xforms=mkmapping();
 
   numerrors=0;
   if(process_file(argv[optind])) {

@@ -35,8 +35,8 @@ void xprint(FILE *f, VT a)
       case 'S': fprintf(f, "signed"); break;
       case 'U': fprintf(f, "unsigned"); break;
       case 'W': fprintf(f, "wraparound"); break;
-      } fprintf(f, ", bits=%d, padbits=%d )", a->xnumeric.bits,
-		a->xnumeric.padbits); break;
+      } fprintf(f, ", bits=%d, padbits=%d, xform=%d )", a->xnumeric.bits,
+		a->xnumeric.padbits, a->xnumeric.xform); break;
     case XBITSLICE:
       fprintf(f, "BITSLICE( %d bits @%d, value = ", a->xbitslice.bits,
 	      a->xbitslice.offs);
@@ -126,7 +126,7 @@ VT mkenum()
   return e;
 }
 
-VT mknumeric(char s, int b, int p, int r)
+VT mknumeric(char s, int b, int p, int r, int x)
 {
   VT n=poolalloc(&numericpool);
   n->type=XNUMERIC;
@@ -134,6 +134,7 @@ VT mknumeric(char s, int b, int p, int r)
   n->xnumeric.bits=b;
   n->xnumeric.padbits=p;
   n->xnumeric.relative=r;
+  n->xnumeric.xform=x;
   return n;
 }
 
