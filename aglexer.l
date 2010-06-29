@@ -48,6 +48,8 @@ signed		return T_SIGNED;
 unsigned	return T_UNSIGNED;
 wraparound	return T_WRAPAROUND;
 relative        return T_RELATIVE;
+xform		return T_XFORM;
+set		return T_SET;
 
 \=		return T_EQ;
 \{		{ BEGIN(ENUM); return T_ENUMSTART; }

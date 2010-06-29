@@ -33,8 +33,8 @@ extern SMV *be_holdSMVs;
 #define GEN(x,b) begen(x,b)
 #define XGEN1(n,x) do{bexgen1(n,x);}while(0)
 #define XGEN2(n,x1,x2) do{bexgen2(n,x1,x2);}while(0)
-#define XGEN3(n,x1,x2,x3) do{bexgen1(n,x1,x2,x3);}while(0)
-#define XGEN4(n,x1,x2,x3,x4) do{bexgen1(n,x1,x2,x3,x4);}while(0)
+#define XGEN3(n,x1,x2,x3) do{bexgen3(n,x1,x2,x3);}while(0)
+#define XGEN4(n,x1,x2,x3,x4) do{bexgen4(n,x1,x2,x3,x4);}while(0)
 
 #define HOLD(x,b) ((--be_freehold)?(((void)(*be_holdbits++=b)),((void)(*be_holdSMVs++=x))):behold(x,b))
 
@@ -47,6 +47,10 @@ extern void be_emitx4(int, numtype, numtype, numtype, numtype);
 #define EMITX2(n,v1,v2)       be_emitx2(n,v1,v2)
 #define EMITX3(n,v1,v2,v3)    be_emitx3(n,v1,v2,v3)
 #define EMITX4(n,v1,v2,v3,v4) be_emitx4(n,v1,v2,v3,v4)
+
+extern numtype be_xform(int, numtype);
+
+#define XFORMX(n,v) be_xform(n,v)
 
 extern void be_emitn(int, numtype);
 extern void be_emiti(int, unsigned char *);

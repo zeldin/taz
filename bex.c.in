@@ -54,6 +54,7 @@ static void checknumXW(numtype v, int bits)
     errormsg("value is out of range %d bits", bits);
 }
 
+<- xforms ->
 
 void be_emitx1(int n, numtype v1)
 {

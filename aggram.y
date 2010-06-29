@@ -24,8 +24,8 @@ static long decodebits(const char *);
 %token <num> T_NUMBER T_TEMPNUMTOK
 
 %token T_INCLUDE T_INCDIR
-%token T_ENUM T_NUMERIC T_TEMPLATE T_DEFAULT
-%token T_BITS T_ZPADTO T_SPADTO T_SIGNED T_UNSIGNED T_WRAPAROUND T_RELATIVE
+%token T_ENUM T_NUMERIC T_TEMPLATE T_DEFAULT T_SET
+%token T_BITS T_ZPADTO T_SPADTO T_SIGNED T_UNSIGNED T_WRAPAROUND T_RELATIVE T_XFORM
 %token T_ENUMSTART T_ENUMEND
 %token T_TEMPLSTART T_TEMPLEND T_TEMPLWS
 %token T_EQ T_COLON
@@ -34,7 +34,7 @@ static long decodebits(const char *);
 %type<vt> templatedefs templatedef
 %type<vt> bitfield bitfieldcomps bitfieldcomp
 %type<vt> extrafields extrafield tpattern ttoken
-%type<num> signedness numbits numpadbits relative
+%type<num> signedness numbits numpadbits relative xform varname
 
 %%
 
@@ -45,6 +45,7 @@ definitions : definitions definition |
 definition : meta
 	   | classdef
 	   | maintemplate
+           | T_SET varname T_STRING { varset($2, $3); }
 
 meta	: T_INCDIR T_STRING	{ add_incdir($2); }
 	| T_INCLUDE T_STRING	{ if(!process_include($2))
@@ -52,8 +53,8 @@ meta	: T_INCDIR T_STRING	{ add_incdir($2); }
 
 
 classdef : T_ENUM enumdefname T_ENUMSTART {en=-1;} enumdefs T_ENUMEND edefault
-	 | T_NUMERIC classdefname signedness numbits numpadbits relative
-		{ mapset(classes, $2, mknumeric($3, $4, $5, $6)); }
+	 | T_NUMERIC classdefname signedness numbits numpadbits relative xform
+		{ mapset(classes, $2, mknumeric($3, $4, $5, $6, $7)); }
 	 | T_TEMPLATE classdefname T_TEMPLSTART templateblock T_TEMPLEND
 		{ mapset(classes, $2, $4); }
 
@@ -82,6 +83,9 @@ numpadbits : T_ZPADTO T_EQ T_NUMBER { $$ = $3; }
 
 relative : T_RELATIVE T_EQ T_NUMBER { $$ = $3; }
          | { $$ = -1; }
+
+xform : T_XFORM T_EQ T_STRING { $$ = registerxform($3); }
+      | { $$ = -1; }
 
 maintemplate : T_TEMPLATE T_TEMPLSTART templateblock T_TEMPLEND
 		{ if(opcode_template!=NIL) {
@@ -136,6 +140,8 @@ classdefname : T_CLASSDEFNAME
 	    { errormsg("Duplicate declaration of class %s", $1); YYABORT; }
 	  $$=s;
 	}
+
+varname : T_STRING { if(($$ = varlookup($1))<0) { errormsg("Unknown variable %s", $1); YYABORT; } }
 
 %%
 

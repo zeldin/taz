@@ -19,6 +19,7 @@
 #define M_CHECKS 19
 #define M_CHECKW 20
 #define M_CHECKX 21
+#define M_XFORM 22
 
 #define M_MAX_BINARY  M_MOD
 #define M_MAX_UNARY   M_NOT
@@ -29,6 +30,7 @@ extern SMV mkicon(numtype);
 extern SMV mksymbref(struct symbol *);
 extern SMV mkunary(int, SMV);
 extern SMV mkbinary(int, SMV, SMV);
+extern SMV mkxform(int, SMV);
 extern SMV mkls(int, SMV, int);
 extern SMV mkchecknum(int, SMV, int);
 extern int evalconst(SMV, numtype *);

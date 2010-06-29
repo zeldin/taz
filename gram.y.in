@@ -1,3 +1,4 @@
+<- bison-options ->
 
 %{
 
@@ -36,6 +37,7 @@ extern struct mempool symbolnamepool;
 #define MKNEG(x)   mkunary(M_NEG, (x))
 #define MKCPL(x)   mkunary(M_CPL, (x))
 #define MKNOT(x)   mkunary(M_NOT, (x))
+#define MKXFORM(n,x) mkxform(n, (x))
 
 %}
 
