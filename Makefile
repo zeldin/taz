@@ -20,7 +20,7 @@ ASMGENFILE = m68k.tab
 HASHSIZE = 12000
 
 OBJS = main.o lexer.o gram.o file.o symbol.o storage.o macro.o smach.o \
-		backend.o bex.o dmalloc.o
+		backend.o bex.o dmalloc.o $(XFORMOBJS)
 
 AGOBJS = asmgen.o aglexer.o aggram.o agstorage.o fileag.o storage.o dmalloc.o
 
@@ -96,4 +96,6 @@ backend.o : backend.c taz.h smach.h backend.h
 bex.o : bex.c taz.h smach.h backend.h
 
 dmalloc.o : dmalloc.c
+
+xforms%.o : xforms%.c taz.h smach.h backend.h
 
