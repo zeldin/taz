@@ -763,7 +763,8 @@ fprintf(stderr, "\n");
       case OP_LOADL:
 	{
 	  struct symbol *s = locate_sym(pfx);
-	  PUSH((s->value.num==0xdeadbeef? *current_loc : s->value.num));
+	  PUSH((s->value.num==0xdeadbeef && s->type==SYMB_UNDECIDED?
+		*current_loc : s->value.num));
 	  pfx=0;
 	  break;
 	}
