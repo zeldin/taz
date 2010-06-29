@@ -70,13 +70,16 @@ struct stdtoken { char *str, *token; } stdtok[] = {
 #define M_X2 32768
 #define M_X3 65536
 #define M_X4 131072
+#define M_BISON_OPTIONS 262144
+#define M_NOKEY 524288
 
 #define FLAG_OPCODE (M_OPCODERE|M_OPCODETOK)
 
 struct { char *name, *value; int mask; } var[] = {
   { "trailcomment", ";", M_DEF },
   { "linecomment", "[#*]", M_DEF },
-  { "label", "[a-zA-Z_@.][a-zA-Z$_@.0-9]*", M_DEF }
+  { "label", "[a-zA-Z_@.][a-zA-Z$_@.0-9]*", M_DEF },
+  { "bison-options", "", M_BISON_OPTIONS|M_NOKEY },
 };
 #define NUMVARS (sizeof(var)/sizeof(var[0]))
 
@@ -517,8 +520,12 @@ void gen_output(FILE *f, int mask)
   VT iter, tok, nam, cls;
 
   for(i=0; i<NUMVARS; i++)
-    if(var[i].mask&mask)
-      fprintf(f, "%s %s\n", var[i].name, var[i].value);
+    if(var[i].mask&mask) {
+      if(var[i].mask&M_NOKEY)
+	fprintf(f, "%s\n", var[i].value);
+      else
+	fprintf(f, "%s %s\n", var[i].name, var[i].value);
+    }
 
   MAPITER(classes, iter, nam, cls) {
     xassert(nam, XSTRING);
@@ -619,6 +626,7 @@ struct { char *name; int mask; } tag[] = {
   { "emitx2", M_EMITX|M_X2 },
   { "emitx3", M_EMITX|M_X3 },
   { "emitx4", M_EMITX|M_X4 },
+  { "bison-options", M_BISON_OPTIONS },
 };
 #define NUMTAGS (sizeof(tag)/sizeof(tag[0]))
 
