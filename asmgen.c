@@ -1072,6 +1072,20 @@ void crunchenum(VT e)
   e->xenum.map=map;
 }
 
+int varlookup(const char *name)
+{
+  int i;
+  for(i=0; i<NUMVARS; i++)
+    if(!strcmp(var[i].name, name))
+      return i;
+  return -1;
+}
+
+void varset(int v, const char *value)
+{
+  var[v].value = strdup(value);
+}
+
 int main(int argc, char *argv[])
 {
   char buf[128], *outfile=NULL;

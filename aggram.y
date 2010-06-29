@@ -24,7 +24,7 @@ static long decodebits(const char *);
 %token <num> T_NUMBER T_TEMPNUMTOK
 
 %token T_INCLUDE T_INCDIR
-%token T_ENUM T_NUMERIC T_TEMPLATE T_DEFAULT
+%token T_ENUM T_NUMERIC T_TEMPLATE T_DEFAULT T_SET
 %token T_BITS T_ZPADTO T_SPADTO T_SIGNED T_UNSIGNED T_WRAPAROUND T_RELATIVE
 %token T_ENUMSTART T_ENUMEND
 %token T_TEMPLSTART T_TEMPLEND T_TEMPLWS
@@ -34,7 +34,7 @@ static long decodebits(const char *);
 %type<vt> templatedefs templatedef
 %type<vt> bitfield bitfieldcomps bitfieldcomp
 %type<vt> extrafields extrafield tpattern ttoken
-%type<num> signedness numbits numpadbits relative
+%type<num> signedness numbits numpadbits relative varname
 
 %%
 
@@ -45,6 +45,7 @@ definitions : definitions definition |
 definition : meta
 	   | classdef
 	   | maintemplate
+           | T_SET varname T_STRING { varset($2, $3); }
 
 meta	: T_INCDIR T_STRING	{ add_incdir($2); }
 	| T_INCLUDE T_STRING	{ if(!process_include($2))
@@ -136,6 +137,8 @@ classdefname : T_CLASSDEFNAME
 	    { errormsg("Duplicate declaration of class %s", $1); YYABORT; }
 	  $$=s;
 	}
+
+varname : T_STRING { if(($$ = varlookup($1))<0) { errormsg("Unknown variable %s", $1); YYABORT; } }
 
 %%
 

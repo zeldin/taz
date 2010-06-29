@@ -101,6 +101,8 @@ extern VT listadd(VT l, VT e);
 extern void mapset(VT, VT, VT);
 extern VT mapget(VT, VT);
 extern void ags_init();
+extern int varlookup(const char *name);
+extern void varset(int var, const char *value);
 
 extern VT classes, opcode_template;
 extern struct mempool textpool;
