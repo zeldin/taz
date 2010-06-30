@@ -359,6 +359,15 @@ void print_deferredgen(FILE *f, VT bss, int *n)
   fprintf(f, ");");
 }
 
+static char equiv_signedness(VT cls)
+{
+  if(cls->xnumeric.signedness == 'S' &&
+     cls->xnumeric.relative != -1)
+    return 'U';
+  else
+    return cls->xnumeric.signedness;
+}
+
 int mergable(VT t1, VT t2)
 {
   int mm, mergemode = 0;
@@ -385,10 +394,16 @@ int mergable(VT t1, VT t2)
       if(strcmp(tok1->xclass.str->xstring.str, tok2->xclass.str->xstring.str)) {
 	VT cls1=mapget(classes,tok1->xclass.str);
 	VT cls2=mapget(classes,tok2->xclass.str);
-	if(cls1->type != cls2->type || cls1->type != XNUMERIC ||
-	   cls1->xnumeric.signedness != cls2->xnumeric.signedness
+	if(cls1->type != cls2->type || cls1->type != XNUMERIC)
+	  return 0;
+#if 0
+	if(cls1->xnumeric.signedness != cls2->xnumeric.signedness
 	   /*|| cls1->xnumeric.relative != cls2->xnumeric.relative*/)
 	  return 0;
+#else
+	if(equiv_signedness(cls1) != equiv_signedness(cls2))
+	  return 0;
+#endif
 	if(cls1->xnumeric.bits == cls2->xnumeric.bits) {
 	  if(cls1->xnumeric.xform<0 || !cls2->xnumeric.xform<0 ||
 	     cls1->xnumeric.xform == cls2->xnumeric.xform )
