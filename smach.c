@@ -715,6 +715,7 @@ fprintf(stderr, "\n");
       case OP_LS2(128): STKVAL(0)<<=128; break;
       case OP_XFORM:
 	STKVAL(0)=XFORMX(pfx, STKVAL(0));
+	pfx = 0;
 	break;
       case OP_CHECKU:
 	if(STKVAL(0)<0 || STKVAL(0)>=(1<<pfx))
