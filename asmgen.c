@@ -1,13 +1,5 @@
 /*
- * $Id: asmgen.c,v 1.2 1997-09-27 01:52:56 marcus Exp $
- *
- * $Log: asmgen.c,v $
- * Revision 1.2  1997-09-27 01:52:56  marcus
- * An empty primary is now accepted.
- *
- * Revision 1.1.1.1  1997/08/28 23:26:03  marcus
- * Imported sources
- *
+ * $Id$
  */
 
 #include <stdio.h>

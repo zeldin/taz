@@ -1,12 +1,5 @@
 #
-# $Id: Makefile,v 1.2 1997-08-28 23:42:30 marcus Exp $
-#
-# $Log: Makefile,v $
-# Revision 1.2  1997-08-28 23:42:30  marcus
-# make clean now removes y.output.
-#
-# Revision 1.1.1.1  1997/08/28 23:26:03  marcus
-# Imported sources
+# $Id$
 #
 
 CC = gcc

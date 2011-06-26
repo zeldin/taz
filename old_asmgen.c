@@ -1,10 +1,5 @@
 /*
- * $Id: old_asmgen.c,v 1.1.1.1 1997-08-28 23:26:03 marcus Exp $
- *
- * $Log: old_asmgen.c,v $
- * Revision 1.1.1.1  1997-08-28 23:26:03  marcus
- * Imported sources
- *
+ * $Id$
  */
 
 #include <stdio.h>
