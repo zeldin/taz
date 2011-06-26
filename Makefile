@@ -2,14 +2,14 @@
 # $Id$
 #
 
+-include config.mk
+
 CC = gcc
 LEX = flex
 YACC = bison -y
 RM = rm -f
 CFLAGS = -g -Wall -pedantic -DDEBUG -DDEBUG_MALLOC -DTARGET=\"$(TARGET)\" # -O4711
 
-TARGET = as68k
-ASMGENFILE = config/m68k.tab
 HASHSIZE = 12000
 
 OBJS = main.o lexer.o gram.o file.o symbol.o storage.o macro.o smach.o \
@@ -17,7 +17,7 @@ OBJS = main.o lexer.o gram.o file.o symbol.o storage.o macro.o smach.o \
 
 AGOBJS = asmgen.o aglexer.o aggram.o agstorage.o fileag.o storage.o dmalloc.o
 
-all : $(TARGET)
+all : check_target $(TARGET)
 
 clean :
 	-$(RM) *.o *~ core
@@ -92,4 +92,19 @@ bex.o : bex.c taz.h smach.h backend.h
 dmalloc.o : dmalloc.c
 
 xforms%.o : xforms%.c taz.h smach.h backend.h
+
+#
+# Configurartion section
+#
+
+config: check_target
+	@echo "Configuring for building $(TARGET)"
+	@echo "TARGET=$(TARGET)" > config.mk
+	@echo "ASMGENFILE=$(ASMGENFILE)" >> config.mk
+
+check_target:
+	@test -n "$(TARGET)" || (echo "No configuration selected, see README" && exit 1)
+
+config_m68k :
+	$(MAKE) TARGET=as68k ASMGENFILE=config/m68k.tab config
 

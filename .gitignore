@@ -11,3 +11,4 @@ gram.c
 bex.c
 sieve
 as68k
+config.mk
