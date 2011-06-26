@@ -30,8 +30,9 @@ clean :
 	-$(RM) *.o *~ core
 	-$(RM) $(TARGET) asmgen sieve
 	-$(RM) lexer.c lexer.l
-	-$(RM) gram.c gram.h gram.y y.tab.c y.tab.h y.output
+	-$(RM) gram.c gram.h gram.y y.tab.c y.tab.h y.output gram.output
 	-$(RM) aglexer.c aggram.c aggram.h
+	-$(RM) bex.c
 
 $(TARGET) : $(OBJS)
 	$(CC) $^ -o $@
