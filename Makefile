@@ -9,7 +9,7 @@ RM = rm -f
 CFLAGS = -g -Wall -pedantic -DDEBUG -DDEBUG_MALLOC -DTARGET=\"$(TARGET)\" # -O4711
 
 TARGET = as68k
-ASMGENFILE = m68k.tab
+ASMGENFILE = config/m68k.tab
 HASHSIZE = 12000
 
 OBJS = main.o lexer.o gram.o file.o symbol.o storage.o macro.o smach.o \
