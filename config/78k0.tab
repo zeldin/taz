@@ -1,0 +1,273 @@
+
+set "bison-options" "%glr-parser"
+
+set "label" "[a-zA-Z_@][a-zA-Z$_@0-9]*"
+
+numeric(Y) bits=8
+numeric(W) bits=16 xform="swap16x"
+
+numeric(I) unsigned bits=8
+numeric(S) unsigned bits=8 xform="saddr"  // fe20-feff=>20-ff, ff00-ff1f=>00-1f
+numeric(F) unsigned bits=8 xform="sfr"    // ff00-ffff=>00-ff
+numeric(M) unsigned bits=16 xform="swap16u"
+numeric(G) unsigned bits=15 xform="addr11" // 0800-0fff=>000-7ff
+numeric(K) unsigned bits=5 xform="addr5"   // 0040-007e=>00-1f
+
+numeric(T) unsigned bits=3
+
+numeric(J) signed bits=8 relative=2
+numeric(L) signed bits=8 relative=3
+numeric(N) signed bits=8 relative=4
+
+enum(A) { R1 A }
+enum(X) { RP0 AX }
+enum(Z) { R0 X }
+enum(R) { R0 R1 R2 R3 R4 R5 R6 R7 X=0 A C B E D L H }
+enum(Q) { R0 R2=2 R3 R4 R5 R6 R7 X=0 C=2 B E D L H }
+enum(P) { RP0 RP1 RP2 RP3 AX=0 BC DE HL }
+enum(U) { RP1=1 RP2 RP3 BC=1 DE HL }
+enum(C) { R2 C }
+enum(B) { R3 B }
+enum(D) { RP2 DE }
+enum(H) { RP3 HL }
+
+template {{
+  10100rrrbbbbbbbb          :   MOV   Rr,#Yb
+  00010001ssssssssbbbbbbbb  :   MOV   Ss,#Yb
+  00010011ffffffffbbbbbbbb  :   MOV   Ff,#Yb
+  01100qqq		    :   MOV   A_,Qq
+  01110qqq		    :   MOV   Qq,A_
+  11110000ssssssss	    :   MOV   A_,Ss
+  11110010ssssssss	    :   MOV   Ss,A_
+  11110100ffffffff	    :   MOV   A_,Ff
+  11110110ffffffff	    :   MOV   Ff,A_
+  10001110aaaaaaaaaaaaaaaa  :   MOV   A_,Ma
+  10011110aaaaaaaaaaaaaaaa  :   MOV   Ma,A_
+  0001000100011110bbbbbbbb  :   MOV   PSW,#Yb
+  1111000000011110	    :   MOV   A_,PSW
+  1111001000011110	    :   MOV   PSW,A_
+  10000101		    :   MOV   A_,[D_]
+  10010101		    :   MOV   [D_],A_
+  10000111		    :   MOV   A_,[H_]
+  10010111		    :   MOV   [H_],A_
+  10101110iiiiiiii	    :   MOV   A_,[H_+Ii]
+  10111110iiiiiiii	    :   MOV   [H_+Ii],A_
+  10101011		    :   MOV   A_,[H_+B_]
+  10111011		    :   MOV   [H_+B_],A_
+  10101010		    :   MOV   A_,[H_+C_]
+  10111010		    :   MOV   [H_+C_],A_
+  00110qqq		    :   XCH   A_,Qq
+  10000011ssssssss	    :   XCH   A_,Ss
+  10010011ffffffff	    :   XCH   A_,Ff
+  11001110aaaaaaaaaaaaaaaa  :   XCH   A,Ma
+  00000101		    :   XCH   A_,[D_]
+  00000111		    :   XCH   A_,[H_]
+  11011110iiiiiiii	    :   XCH   A_,[H_+Ii]
+  0011000110001011	    :   XCH   A_,[H_+B_]
+  0011000110001010	    :   XCH   A_,[H_+C_]
+
+  00010pp0wwwwwwwwwwwwwwww  :   MOVW  Pp,#Ww
+  11101110sssssssswwwwwwwwwwwwwwww  :   MOVW  Ss,#Ww
+  11111110ffffffffwwwwwwwwwwwwwwww  :   MOVW  Ff,#Ww
+  10001001ssssssss	    :	MOVW  X_,Ss
+  10011001ssssssss	    :   MOVW  Ss,X_
+  10101001ffffffff	    :   MOVW  X_,Ff
+  10111001ffffffff	    :   MOVW  Ff,X_
+  11000uu0		    :   MOVW  X_,Uu
+  11010uu0		    :   MOVW  Uu,X_
+  00000010aaaaaaaaaaaaaaaa  :   MOVW  X_,Ma
+  00000011aaaaaaaaaaaaaaaa  :   MOVW  Ma,X_
+  11100uu0		    :   XCHW  X_,Uu
+  00001101bbbbbbbb	    :   ADD   A_,#Yb
+  10001000ssssssssbbbbbbbb  :   ADD   Ss,#Yb
+  0110000100001qqq	    :   ADD   A_,Qq
+  0110000100000rrr	    :   ADD   Rr,A_
+  00001110ssssssss	    :   ADD   A_,Ss
+  00001000aaaaaaaaaaaaaaaa  :   ADD   A_,Ma
+  00001111		    :   ADD   A_,[H_]
+  00001001iiiiiiii	    :   ADD   A_,[H_+Ii]
+  0011000100001011	    :   ADD   A_,[H_+B_]
+  0011000100001010	    :   ADD   A_,[H_+C_]
+  00101101bbbbbbbb	    :   ADDC  A_,#Yb
+  10101000ssssssssbbbbbbbb  :   ADDC  Ss,#Yb
+  0110000100101qqq	    :   ADDC  A_,Qq
+  0110000100100rrr	    :   ADDC  Rr,A_
+  00101110ssssssss	    :   ADDC  A_,Ss
+  00101000aaaaaaaaaaaaaaaa  :   ADDC  A_,Ma
+  00101111		    :   ADDC  A_,[H_]
+  00101001iiiiiiii	    :   ADDC  A_,[H_+Ii]
+  0011000100101011	    :   ADDC  A_,[H_+B_]
+  0011000100101010	    :	ADDC  A_,[H_+C_]
+
+  00011101bbbbbbbb          :   SUB   A_,#Yb
+  10011000ssssssssbbbbbbbb  :   SUB   Ss,#Yb
+  0110000100011qqq          :   SUB   A_,Qq
+  0110000100010rrr          :   SUB   Rr,A_
+  00011110ssssssss          :   SUB   A_,Ss
+  00011000aaaaaaaaaaaaaaaa  :   SUB   A_,Ma
+  00011111                  :   SUB   A_,[H_]
+  00011001iiiiiiii          :   SUB   A_,[H_+Ii]
+  0011000100011011          :   SUB   A_,[H_+B_]
+  0011000100011010          :   SUB   A_,[H_+C_]
+  00111101bbbbbbbb          :   SUBC  A_,#Yb
+  10111000ssssssssbbbbbbbb  :   SUBC  Ss,#Yb
+  0110000100111qqq          :   SUBC  A_,Qq
+  0110000100110rrr          :   SUBC  Rr,A_
+  00111110ssssssss          :   SUBC  A_,Ss
+  00111000aaaaaaaaaaaaaaaa  :   SUBC  A_,Ma
+  00111111                  :   SUBC  A_,[H_]
+  00111001iiiiiiii          :   SUBC  A_,[H_+Ii]
+  0011000100111011          :   SUBC  A_,[H_+B_]
+  0011000100111010          :   SUBC  A_,[H_+C_]
+  01011101bbbbbbbb          :   AND   A_,#Yb
+  11011000ssssssssbbbbbbbb  :   AND   Ss,#Yb
+  0110000101011qqq          :   AND   A_,Qq
+  0110000101010rrr          :   AND   Rr,A_
+  01011110ssssssss          :   AND   A_,Ss
+  01011000aaaaaaaaaaaaaaaa  :   AND   A_,Ma
+  01011111                  :   AND   A_,[H_]
+  01011001iiiiiiii          :   AND   A_,[H_+Ii]
+  0011000101011011          :   AND   A_,[H_+B_]
+  0011000101011010          :   AND   A_,[H_+C_]
+
+  01101101bbbbbbbb          :   OR    A_,#Yb
+  11101000ssssssssbbbbbbbb  :   OR    Ss,#Yb
+  0110000101101qqq          :   OR    A_,Qq
+  0110000101100rrr          :   OR    Rr,A_
+  01101110ssssssss          :   OR    A_,Ss
+  01101000aaaaaaaaaaaaaaaa  :   OR    A_,Ma
+  01101111                  :   OR    A_,[H_]
+  01101001iiiiiiii          :   OR    A_,[H_+Ii]
+  0011000101101011          :   OR    A_,[H_+B_]
+  0011000101101010          :   OR    A_,[H_+C_]
+  01111101bbbbbbbb          :   XOR   A_,#Yb
+  11111000ssssssssbbbbbbbb  :   XOR   Ss,#Yb
+  0110000101111qqq          :   XOR   A_,Qq
+  0110000101110rrr          :   XOR   Rr,A_
+  01111110ssssssss          :   XOR   A_,Ss
+  01111000aaaaaaaaaaaaaaaa  :   XOR   A_,Ma
+  01111111                  :   XOR   A_,[H_]
+  01111001iiiiiiii          :   XOR   A_,[H_+Ii]
+  0011000101111011          :   XOR   A_,[H_+B_]
+  0011000101111010          :   XOR   A_,[H_+C_]
+  01001101bbbbbbbb          :   CMP   A_,#Yb
+  11001000ssssssssbbbbbbbb  :   CMP   Ss,#Yb
+  0110000101001qqq          :   CMP   A_,Qq
+  0110000101000rrr          :   CMP   Rr,A_
+  01001110ssssssss          :   CMP   A_,Ss
+  01001000aaaaaaaaaaaaaaaa  :   CMP   A_,Ma
+  01001111                  :   CMP   A_,[H_]
+  01001001iiiiiiii          :   CMP   A_,[H_+Ii]
+  0011000101001011          :   CMP   A_,[H_+B_]
+  0011000101001010          :   CMP   A_,[H_+C_]
+
+  11001010wwwwwwwwwwwwwwww  :   ADDW  X_,#Ww
+  11011010wwwwwwwwwwwwwwww  :   SUBW  X_,#Ww
+  11101010wwwwwwwwwwwwwwww  :   CMPW  X_,#Ww
+  0011000110001000          :   MULU  Z_
+  0011000110000010          :   DIVUW C_
+  01000rrr                  :   INC   Rr
+  10000001ssssssss          :   INC   Ss
+  01010rrr                  :   DEC   Rr
+  10010001ssssssss          :   DEC   Ss
+  10000pp0                  :   INCW  Pp
+  10010pp0                  :   DECW  Pp
+  00100100                  :   ROR   A_
+  00100110                  :   ROL   A_
+  00100101                  :   RORC  A_
+  00100111                  :   ROLC  A_
+  0011000110010000          :   ROR4  [H_]
+  0011000110000000          :   ROL4  [H_]
+  0110000110000000          :   ADJBA
+  0110000110010000          :   ADJBS
+  011100010ttt0100ssssssss  :   MOV1  CY,Ss.Tt
+  011100010ttt1100ffffffff  :   MOV1  CY,Ff.Tt
+  011000011ttt1100          :   MOV1  CY,A_.Tt
+  011100010ttt010000011110  :   MOV1  CY,PSW.Tt
+  011100011ttt0100          :   MOV1  CY,[H_].Tt
+  011100010ttt0001ssssssss  :   MOV1  Ss.Tt,CY
+  011100010ttt1001ffffffff  :   MOV1  Ff.Tt,CY
+  011000011ttt1001          :   MOV1  A_.Tt,CY
+  011100010ttt000100011110  :   MOV1  PSW.Tt,CY
+  011100011ttt0001          :   MOV1  [H_].Tt,CY
+  011100010ttt0101ssssssss  :   AND1  CY,Ss.Tt
+  011100010ttt1101ffffffff  :   AND1  CY,Ff.Tt
+  011000011ttt1101          :   AND1  CY,A_.Tt
+  011100010ttt010100011110  :   AND1  CY,PSW.Tt
+  011100011ttt0101          :   AND1  CY,[H_].Tt
+
+  011100010ttt0110ssssssss  :   OR1   CY,Ss.Tt
+  011100010ttt1110ffffffff  :   OR1   CY,Ff.Tt
+  011000011ttt1110          :   OR1   CY,A_.Tt
+  011100010ttt011000011110  :   OR1   CY,PSW.Tt
+  011100011ttt0110          :   OR1   CY,[H_].Tt
+  011100010ttt0111ssssssss  :   XOR1  CY,Ss.Tt
+  011100010ttt1111ffffffff  :   XOR1  CY,Ff.Tt
+  011000011ttt1111          :   XOR1  CY,A_.Tt
+  011100010ttt011100011110  :   XOR1  CY,PSW.Tt
+  011100011ttt0111          :   XOR1  CY,[H_].Tt
+  0ttt1010ssssssss          :   SET1  Ss.Tt
+  011100010ttt1010ffffffff  :   SET1  Ff.Tt
+  011000011ttt1010          :   SET1  A_.Tt
+  0ttt101000011110          :   SET1  PSW.Tt
+  011100011ttt0010          :   SET1  [H_].Tt
+  0ttt1011ssssssss          :   CLR1  Ss.Tt
+  011100010ttt1011ffffffff  :   CLR1  Ff.Tt
+  011000011ttt1011          :   CLR1  A_.Tt
+  0ttt101100011110          :   CLR1  PSW.Tt
+  011100011ttt0011          :   CLR1  [H_].Tt
+  00100000                  :   SET1  CY
+  00100001                  :   CLR1  CY
+  00000001                  :   NOT1  CY
+  10011010aaaaaaaaaaaaaaaa  :   CALL  Ma
+  0aaaaaaaaaaaaaaa          :   CALLF Ga
+  11aaaaa1                  :   CALLT [Ka]
+  10111111                  :   BRK
+  10101111                  :   RET
+  10011111                  :   RETB
+  10001111                  :   RETI
+  00100010                  :   PUSH  PSW
+  10110pp1                  :   PUSH  Pp
+  00100011                  :   POP   PSW
+  10110pp0                  :   POP   Pp
+  1110111000011100wwwwwwwwwwwwwwww  :   MOVW  SP,#Ww
+  1001100100011100          :   MOVW  SP,X_
+  1000100100011100          :   MOVW  X_,SP
+
+  10011011aaaaaaaaaaaaaaaa  :   BR    Ma
+  11111010rrrrrrrr          :   BR    Jr
+  0011000110011000          :   BR    AX
+  10001101rrrrrrrr          :   BC    Jr
+  10011101rrrrrrrr          :   BNC   Jr
+  10101101rrrrrrrr          :   BZ    Jr
+  10111101rrrrrrrr          :   BNZ   Jr
+  1ttt1100ssssssssrrrrrrrr  :   BT    Ss.Tt,Lr
+  001100010ttt0110ffffffffrrrrrrrr  :   BT    Ff.Tt,Nr
+  001100010ttt1110rrrrrrrr  :   BT    A_.Tt,Lr
+  1ttt110000011110rrrrrrrr  :   BT    PSW.Tt,Lr
+  001100011ttt0110rrrrrrrr  :   BT    [H_].Tt,Lr
+  001100010ttt0011ssssssssrrrrrrrr  :   BF    Ss.Tt,Nr
+  001100010ttt0111ffffffffrrrrrrrr  :   BF    Ff.Tt,Nr
+  001100010ttt1111rrrrrrrr  :   BF    A_.Tt,Lr
+  001100010ttt001100011110rrrrrrrr  :   BF    PSW.Tt,Nr
+  001100011ttt0111rrrrrrrr  :   BF    [H_].Tt,Lr
+  001100010ttt0001ssssssssrrrrrrrr  :   BTCLR Ss.Tt,Nr
+  001100010ttt0101ffffffffrrrrrrrr  :   BTCLR Ff.Tt,Nr
+  001100010ttt1101rrrrrrrr  :   BTCLR A_.Tt,Lr
+  001100010ttt000100011110rrrrrrrr  :   BTCLR PSW.Tt,Nr
+  001100011ttt0101rrrrrrrr  :   BTCLR [H_].Tt,Lr
+  10001011rrrrrrrr          :   DBNZ  B_,Jr
+  10001010rrrrrrrr          :   DBNZ  C_,Jr
+  00000100ssssssssrrrrrrrr  :   DBNZ  Ss,Lr
+  0110000111010000          :   SEL   RB0
+  0110000111011000          :   SEL   RB1
+  0110000111110000          :   SEL   RB2
+  0110000111111000          :   SEL   RB3
+  00000000                  :   NOP
+  0111101000011110          :   EI
+  0111101100011110          :   DI
+  0111000100010000          :   HALT
+  0111000100000000          :   STOP
+
+}}
+

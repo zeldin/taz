@@ -2,13 +2,17 @@
 # $Id$
 #
 
+srcdir = .
+
 -include config.mk
+
+VPATH = $(srcdir):$(srcdir)/config
 
 CC = gcc
 LEX = flex
 YACC = bison -y
 RM = rm -f
-CFLAGS = -g -Wall -pedantic -DDEBUG -DDEBUG_MALLOC -DTARGET=\"$(TARGET)\" # -O4711
+CFLAGS = -g -Wall -pedantic -DDEBUG -DDEBUG_MALLOC -DTARGET=\"$(TARGET)\" -I$(srcdir) # -O4711
 
 HASHSIZE = 12000
 
@@ -101,6 +105,7 @@ config: check_target
 	@echo "Configuring for building $(TARGET)"
 	@echo "TARGET=$(TARGET)" > config.mk
 	@echo "ASMGENFILE=$(ASMGENFILE)" >> config.mk
+	@echo "XFORMOBJS=$(XFORMOBJS)" >> config.mk
 
 check_target:
 	@test -n "$(TARGET)" || (echo "No configuration selected, see README" && exit 1)
@@ -110,4 +115,7 @@ config_m68k :
 
 config_stm8 :
 	$(MAKE) TARGET=asstm8 ASMGENFILE=config/stm8.tab config
+
+config_78k0 :
+	$(MAKE) TARGET=as78k0 ASMGENFILE=config/78k0.tab XFORMOBJS=xforms78k0.o config
 
