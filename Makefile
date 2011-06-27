@@ -108,3 +108,6 @@ check_target:
 config_m68k :
 	$(MAKE) TARGET=as68k ASMGENFILE=config/m68k.tab config
 
+config_stm8 :
+	$(MAKE) TARGET=asstm8 ASMGENFILE=config/stm8.tab config
+
