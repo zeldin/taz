@@ -1,0 +1,475 @@
+taz Manual
+==========
+
+Introduction
+------------
+
+taz is a tool for generating assembers from instruction set templates.
+
+This manual describes how to write such a template, and what features
+the generated assembler will have.
+
+
+The template file
+-----------------
+
+Each instruction set is described by a '.tab' file, which consists of
+three parts:
+
+	- Global settings
+	- Value class declarations
+	- Main template
+
+The main template is mandatory, but the preceding two parts can be empty.
+The global settings are used to override some defaults used in generating
+the assember, such as which characters are legal in labels.  The value
+class declarations declare the properties of parameters used in template
+patterns.  The main template, finally, defines the actual instruction set,
+as a set of patterns.  Each of these parts will be described in detail in
+the following sections.  In order to make this easier, they will be
+described in reverse order, with the main template first.
+
+
+Main template
+~~~~~~~~~~~~~
+
+The main template describes the encoding and syntax of the instruction set.
+It is enclosed in the following stanza:
+
+----------------------------------------------
+template {{
+}}
+----------------------------------------------
+
+Between these braces, any number of template patterns can be placed, one
+on each line.  A pattern gives the bit-pattern encoding for an instruction
+in the instruction set, as well as the syntax used to specify this
+instruction in a program processed by the generated assembler.  The
+bit-pattern and the syntax are delimited by a colon (`:`).  So if the
+instruction set contains a `NOP` instruction which is encoded as the
+bit-pattern `11101010`, this can be expressed as
+
+----------------------------------------------
+  11101010  :  NOP
+----------------------------------------------
+
+Any letters in the syntax to be interpreted literally must be typed
+in upper-case.  However, the generated assembler will accept both
+upper-case and lower-case, so both `NOP` and `nop` (and `NoP`, etc)
+can be used in programs.
+
+Of course, characters other than letters can also be used in the syntax:
+
+----------------------------------------------
+  01111110  :  LD A,(HL)
+----------------------------------------------
+
+The number of bits in the bit-pattern can be different for each template
+pattern, but it must be a multiple of 8.  For systems such as PIC which
+use an instruction width which is not a multiple of 8 bits, it is therefore
+necessary to include padding (place this padding where you would like it
+to appear in the output file of the assember, which will contain bytes):
+
+----------------------------------------------
+  00000001100100   : CLRWDT   <1>
+  0000000001100100 : CLRWDT   <2>
+----------------------------------------------
+<1> Wrong, only the 14 bits of the instruction are specified.
+<2> Correct, the bit-pattern has been padded to 16 bits.
+
+In addition to fixed bit-patterns, it is also possible to have
+parametric fields in the bit-pattern.  This is useful for addresses,
+immediate values etc, but also for e.g. register specification when
+there is a homogenous register file.  Each parameter is identified
+by a lower-case letter, which makes to possible to have up to 26
+parameters in a single template pattern.  It is not necessary to
+pick them in alphabetical order, any letter can be used for any
+parameter.
+
+A parameter is inserted into the bit-pattern by using the
+letter of the parameter instead of a `0` or `1`.  Each instance
+of the letter corresponds to a single bit from the parameter value,
+with the rightmost instance being the LSB.  A parameter can be any
+number of bits, but must appear contiguously in the bit-pattern.
+
+In order for the parameter to receive a value, it must be bound by
+placing a marker in the syntax which consists of an upper-case letter
+followed by a lower-case letter.  The lower-case letter is the letter
+identifiying the parameter in the bit-pattern, while the upper-case letter
+selects a class of input values to be accepted for the parameter.
+The value classes will be explained in the next section.
+
+----------------------------------------------
+  11nnn111  :  RST Vn
+----------------------------------------------
+
+In this example the `Vn` is a placeholder for a parameter of class `V`.
+The parameter specified will be bound to `n`, and inserted at the position
+indicated by `nnn` in the bit-pattern.  So if e.g. `RST 4` appears in the
+source code, this will generate the bit pattern `11100111`.  Only the
+three least significant bits of the parameter value is used by this
+pattern, it is up to the declaration of the value class `V` to make sure
+that proper range checking is done on the parameter.
+
+In some cases, it is desirable to put a parameter placeholder in the
+syntax without actually using the parameter value in the bit-pattern.
+This can be achieved by replacing the lower-case letter in the placeholder
+with an underscore (`_`).  In this case, the parameter will be checked
+to conform with the specified value class, but the actual value is
+discarded.  An example of when to use this is when a specific register
+which has more than one name is required.
+
+
+Value class declarations
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+Value classes determine both the syntax and the numeric range
+of parameters used in template patterns.  Each class is identified
+by an upper-case letter, allowing for 26 different classes.  There
+are three different types of value classes: numeric classes, enum classes,
+and template classes.
+
+Numeric value classes
+^^^^^^^^^^^^^^^^^^^^^
+
+A numeric value class allows for any numeric expression to be used in
+the syntax where a placeholder for that class appears in the template
+pattern.  The class declares the number of significant bits the value
+is allowed to have, and how to treat negative numbers.  For example,
+the declaration
+
+----------------------------------------------
+numeric(N) unsigned bits=8
+----------------------------------------------
+
+allows numbers in the range 0-255 to be used for a parameter of class `N`,
+giving 8 bits of parameter value for use in the bit-pattern.  A numeric
+value class is declared with the keyword `numeric` followed by the class
+designator in parentheses, and then the properties of the class.  There
+are five properties of a numeric value class, which must be specified in
+order, but all except the number of bits has a default value which allows
+the specification of the property to be blank.
+
+[options="header"]
+|=============================================
+|Property        |Syntax         |Meaning
+.4+e|signedness  |'(default)'    |Range is -2^b^..2^b^-1
+                 |`signed`       |Range is -2^b-1^..2^b-1^-1
+                 |`unsigned`     |Range is 0..2^b^-1
+                 |`wraparound`   |Range is 1..2^b^, 2^b^ is encoded as zero
+e|number of bits |++bits=++b     |Parameter has b significant bits
+.3+e|padding     |'(default)'    |The total parameter size is b bits
+                 |++zpadto=++p   |The parameter is zero-extended to p bits
+                 |++spadto=++p   |The parameter is sign-extended to p bits
+.2+e|relativity  |'(default)'    |The parameter is used as is
+                 |++relative=++n |`PC`+n is subtracted from the parameter
+.2+e|transform   |'(default)'    |The parameter is used as is
+                 |`xform=`'func' |The function 'func' is applied to the parameter
+|=============================================
+
+Note that the default 'signedness' actually allows a range that is larger
+than the number of bits can encode.  This is because the intended signedness
+is not always tied to the instruction in use.  For example, loading a
+constant value into a general purpose register typically allows this value
+to be used both in signed contexts (where the MSB acts as sign bit), and
+unsigned contexts (where the sign bit is implied).  For completeness,
+the range allowed is any b-bit number with an implied sign bit of either
+0 or 1.  (This is the same as a b+1-bit number is the MSB as sign bit.)
+It is the programmers responsibility that the number is in range for the
+intended use, the assembler will only check if the number is obviously
+out of range (can not be encoded even with an implied sign bit of the
+correct value).
+
+Relativity is used for relative adressing modes, where the address
+of the instruction is used as a reference point.  Note that the address of
+the start of the instruction is used.  Often a small adjustment is needed
+due to the actual address used by the CPU in the address calculation is
+either the address of the end of the instruction, or some address in the
+middle of the instruction.  This is the purpose of the parameter n.
+
+Transforms are used when the instruction set requires processing of the
+user specified value beyond the functions specified here.  This could for
+example be an implied base offset other than `PC` which needs to be subtracted,
+or the ordering of the bits in the parameter might need to be changed.
+For such occasions, it is possible to use a custom C function to transform
+the parameter value.
+
+Relativity and transform processing take place before the range and encoding
+of the parameter is considered.  If both 'relativity' and 'transform' are
+specified, 'relativity' is applied first.  So for the following numeric
+class
+
+----------------------------------------------
+numeric(N) signed bits=8 relative=5 xform="func"
+----------------------------------------------
+
+it is the value `func(expr-(.+5))` which is checked against the range
+-128..127 and encoded into 8 bits when the parameter `expr` appears in
+the source code.
+
+Enum value classes
+^^^^^^^^^^^^^^^^^^
+
+A parameter of an enum value case does not accept a generic expression.
+Rather, one of a fixed set of keywords must be specified.  Each keyword
+is associated with a number (the same number can be used for multiple
+keywords), and this number becomes the value of the parameter.  Enum
+classes are used for example for named registers.  For example, the
+declaration
+
+----------------------------------------------
+enum(P) { RP0 RP1 RP2 RP3 AX=0 BC DE HL }
+----------------------------------------------
+
+defines a set of four register pairs, each with two allowed names,
+encoded as the numbers 0-3.   An enum value class is declared with the
+keyword `enum` followed by the class designator in parentheses, and then
+the allowed keywords enclosed in braces.  A keyword can optionally be
+followed by an equals sign (`=`) and a number, to give the numeric
+value associated with that keyword.  If no such specification is given,
+the number becomes the number associated with the previous keyword, plus one.
+If no number is specified for the first keyword, it gets the value 0.
+
+
+Template value classes
+^^^^^^^^^^^^^^^^^^^^^^
+
+Template value classes can be used to avoid repetition in the main
+template when the instruction set has a homogeneous construction which
+allows handling of e.g. addressing mode to be separated out.  The template
+value class specified a sub-template which will be matched at the position
+of the placeholder, and generates a bit-pattern to be inserted in the
+instruction code, as well as optionally an extra bit-pattern to be
+appended at the end of the instruction.  The following example shows
+a template class for the 6-bit operand encoding used by TMS9900:
+
+----------------------------------------------
+numeric(A) unsigned bits=16
+enum(R) { R0 R1 R2 R3 R4 R5 R6 R7 R8 R9 R10 R11 R12 R13 R14 R15 }
+enum(Q) { R1=1 R2 R3 R4 R5 R6 R7 R8 R9 R10 R11 R12 R13 R14 R15 }
+
+template(O) {{
+00rrrr                   :  Rr
+01rrrr                   :  *Rr
+100000 aaaaaaaaaaaaaaaa  :  @Aa
+10qqqq aaaaaaaaaaaaaaaa  :  @Aa(Qq)
+11rrrr                   :  *Rr+
+}}
+----------------------------------------------
+
+The class Q here is identical to R, except it does not accept `R0`,
+because this register can not be used for the indexed addressing mode.
+This template can then be used in the main template like this:
+
+----------------------------------------------
+1010ddddddssssss  :  A    Os,Od
+1011ddddddssssss  :  AB   Os,Od
+0000010110ssssss  :  INC  Os
+0000010111ssssss  :  INCT Os
+----------------------------------------------
+
+A template value class is declared with the keyword `template` followed by
+the class designator in parentheses, and then the template patterns enclosed
+in double braces.  Only the presence of the class designator distinguishes
+this syntax from that of the main template.  Semantically there are two
+important differences however.  First, the bitpattern does not need to
+hava a length which is a multiple of 8.  This is because the bitpattern is
+not output directly, but used as a parameter value.  In the example, six
+bits of parameter data is inserted into the 16 bits of instruction encoding
+from each template parameter, so it is perfectly appropriate that the
+bitpatterns have length 6.  Secondly, an additional bitpattern can be
+specified in a template pattern, separated from the first one by whitespace.
+This second bitpattern does not contribute to the parameter value.  Instead,
+is is appended to the encoding of the instruction.  This additional bitpatten
+_does_ need to have a length which is a multiple of 8.
+
+Using the example templates above, giving an input of `INCT @0x1234(R4)`
+will result in the output of the bit patterns +0000010111100100+
++0001001000110100+.  The parameter value `100100` produced by matching
+the sub-template has been inserted into the 16-bit opcode, and the 16-bit
+address put into the additional bitpattern have been appended after the
+opcode.
+
+
+Global settings
+~~~~~~~~~~~~~~~
+
+A global setting takes the form of the keyword `set` followed by the
+setting name and value as two quoted strings.  An example:
+
+----------------------------------------------
+set "label" "[a-zA-Z_@][a-zA-Z$_@0-9]*"
+----------------------------------------------
+
+There are currently four named global settings available:
+
+`trailcomment`::
+  A regexp which matches the start of a comment which may appear either
+  on a line of its own, or at the end of a line containing code.  The
+  default is `;`.
+
+`linecomment`::
+  A regexp which matches the start of a comment which may only appear
+  on a line of its own.  The default is `[#*]`.
+
+`label`::
+  A regexp which matches identifiers permissable as labels.  The default
+  is `[a-zA-Z_@.][a-zA-Z$_@.0-9]*`.
+
+`bison-options`::
+  Any extra options to pass on to `bison`.  The default is empty.
+  A useful option to pass to `bison` is `%glr-parser`, which can be
+  used when the default LALR(1) parser generation leads to conflicts.
+
+
+Selecting and adding targets
+----------------------------
+
+Targets are selected by running `make config_XXX` where `XXX` is the
+name of the target.  This controls the name of generated assembler,
+the '.tab' file it is generated from, and any auxillary source files
+to use for custom transformation functions.
+
+To add a new target, simply add another config rule to the 'Makefile'.
+It should have the following form:
+
+----------------------------------------------
+config_xyz :
+	$(MAKE) TARGET=asxyz ASMGENFILE=config/xyz.tab config
+----------------------------------------------
+
+If the value class declarations of the template specify numeric
+value classes with `xform` properties, the C functions implementing
+these transformations must be put in a file 'xformsxyz.c', and the
+declaration `XFORMOBJS=xformsxyz.o` added to the rule.  It is allowed
+to use more than one source file for the transformation functions, but
+each must have a filename starting with 'xforms'.
+
+
+The generated assembler
+-----------------------
+
+After selecting a target and running `make`, the actual assembler is
+generated.  It will accept the name of the source file, and assemble
+it into an output file with a name derived from the source file.  The
+default is 'file.bin' for a source file called 'file.s'.
+
+The following options are available:
+
+`-h`::
+  Display help
+
+`-s`::
+  Output SREC data instead of raw binary.  The output file will be
+  named 'file.srec'.
+
+`-x`::
+  Output Intel Hex data instead of raw binary.  The output file will
+  be named 'file.ihx'.
+
+`-V`::
+  Display the version number.
+
+`-I incdir`::
+  Add a directory to the include path, just like if an `.incdir` directive
+  had been present in the source code.
+
+
+Pseudo opcodes
+~~~~~~~~~~~~~~
+
+In addition to the opcodes defined by the template file, a number
+of pseudo opcodes are provided for use in the source code.
+
+`.equ`::
+  Set the value of a label.  An equals sign (`=`) may also be used.
+
+`.set`::
+  Set the value of a label.  Unlike `.equ`, this allows the label to
+  be set to different values at different locations in the source code.
+  The value of the label when used will be the value it was set to
+  in the closest preceding `.set` directive.
+
+`.incdir`::
+  Add a directory to the include path.
+
+`.include`::
+  Include the contents of another file into the source at the position
+  of the directive.
+
+++.if++'xxx'::
+  Start a conditional block.  The contents are ignored if the condition
+  is false.  See the following table for a list of conditions.
+
+`.endc`::
+  End a conditional block.
+
+`.macro`::
+  Define a named macro.  The name is given by putting a label on the
+  line with the `.macro` directive.  Arguments to a macro invocation are
+  inserted into the macro body wherever the placeholders `\1`, `\2` etc
+  occur (the number indicating the ordinal position of the argument).
+  A number unique for the specific invocation is inserted instead of the
+  placeholder `\@` (useful for generating labels).
+
+`.endm`::
+  Ends a macro definition.
+
+`.mexit`::
+  Can be used in a macro to prevent the rest of the expansion from
+  being evaluated.  Typically used within a conditional block.
+
+`.end`::
+  Optional marker of the end of the source code.  If present, it must be
+  the last directive in the file.
+
+`.section`::
+  Starts a named section.  Support for named sections is currently unfinished.
+
+`.byte`::
+  Inserts literal bytes into the generated code.  Strings may also be
+  used, in which case the ASCII code of each character is inserted as a
+  literal byte.
+
+`.word`::
+  Inserts literal words (16 bits) into the generated code.
+
+`.org`::
+  Sets the instruction address of the following code.
+
+`.cnop`::
+  Aligns the code such that the instruction address of the following code
+  is equal to the first argument when using the modulo specified by the
+  second argument.  The modulo must be a positive power of two.  Any
+  pad bytes inserted as the result of using this pseudo opcode will contain
+  all zeroes.
+
+
+[options="header"]
+|=============================================
+|Conditional opcode  |Arguments     |Condition tested
+|`.ifd`              |'symbol'      |'symbol' is defined as a label
+|`.ifnd`             |'symbol'      |'symbol' is not defined as a label
+|`.ifc`              |'string','string'  |The two literal strings are equal
+|`.ifnc`             |'string','string'  |The two literal strings are not equal
+|`.ifeq`             |'expr','expr' |The two expressions are equal
+|`.ifne`             |'expr','expr' |The two expressions are not equal
+|`.iflt`             |'expr','expr' |The first expression is less than the second
+|`.ifle`             |'expr','expr' |The first expression is less than the second or equal to it
+|`.ifgt`             |'expr','expr' |The first expression is greater than the second
+|`.ifge`             |'expr','expr' |The first expression is greater than the second or equal to it
+|`.ifeq`             |'expr'        |The expression is equal to zero
+|`.ifne`             |'expr'        |The expression is not equal to zero
+|`.iflt`             |'expr'        |The expression is less than zero
+|`.ifle`             |'expr'        |The expression is less than zero or equal to it
+|`.ifgt`             |'expr'        |The expression is greater than zero
+|`.ifge`             |'expr'        |The expression is greater than zero or equal to it
+|=============================================
+
+Note that expressions used as arguments to conditional blocks may not contain
+forward references to symbols defined later in the source, or references to
+symbols which are themselves defined using such forward references.
+
+The string conditionals only compare literal strings, but can still be useful
+in macros to compare macro arguments against specific character sequences.
+

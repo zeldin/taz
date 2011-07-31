@@ -12,3 +12,4 @@ bex.c
 sieve
 as68k
 config.mk
+Documentation/taz.pdf
